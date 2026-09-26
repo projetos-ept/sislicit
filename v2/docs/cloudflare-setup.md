@@ -176,3 +176,8 @@ INSERT INTO users (username, email, password_hash, role) VALUES (
 - `https://projetos-ept.github.io`
 
 Se adicionar outro domínio, atualize a variável `CORS_ORIGINS` no Worker.
+
+## Deploy
+
+- Worker publicado em: `https://sislicit-api.lucas-batista-biomedico.workers.dev`
+- Pages: `sislicit.pages.dev`
