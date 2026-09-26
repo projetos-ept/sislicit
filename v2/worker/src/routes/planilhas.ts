@@ -18,6 +18,13 @@ async function getPlanilha(db: D1Database, id: number): Promise<PlanilhaRow | nu
   return db.prepare('SELECT * FROM planilhas WHERE id = ?').bind(id).first<PlanilhaRow>();
 }
 
+async function getTotais(db: D1Database, planilhaId: number): Promise<{ total: number; total_itens: number }> {
+  const r = await db.prepare(
+    'SELECT COALESCE(SUM(valor_total),0) AS t, COUNT(*) AS n FROM itens WHERE planilha_id = ?'
+  ).bind(planilhaId).first<{ t: number; n: number }>();
+  return { total: r?.t ?? 0, total_itens: r?.n ?? 0 };
+}
+
 // ── PLANILHAS ─────────────────────────────────────────────────────────────────
 
 app.get('/', async (c) => {
@@ -108,8 +115,8 @@ app.post('/:id/itens', async (c) => {
    .first<ItemRow>();
 
   await touchPlanilha(c.env.DB, planilha.id);
-  const total = (await c.env.DB.prepare('SELECT COALESCE(SUM(valor_total),0) AS t FROM itens WHERE planilha_id = ?').bind(planilha.id).first<{ t: number }>())?.t ?? 0;
-  return c.json({ ok: true, item: r, total_fmt: fmtBRL(total) }, 201);
+  const { total, total_itens } = await getTotais(c.env.DB, planilha.id);
+  return c.json({ ok: true, item: r, total_fmt: fmtBRL(total), total_itens }, 201);
 });
 
 // Row-level update (replaces per-campo AJAX)
@@ -165,7 +172,8 @@ app.delete('/:id/itens/:iid', async (c) => {
     .bind(Number(c.req.param('iid')), planilha.id).run();
   await renumerar(c.env.DB, planilha.id);
   await touchPlanilha(c.env.DB, planilha.id);
-  return c.json({ ok: true });
+  const { total, total_itens } = await getTotais(c.env.DB, planilha.id);
+  return c.json({ ok: true, total_fmt: fmtBRL(total), total_itens });
 });
 
 app.post('/:id/itens/:iid/clonar', async (c) => {
@@ -193,7 +201,13 @@ app.post('/:id/itens/:iid/clonar', async (c) => {
     ? await c.env.DB.prepare('SELECT * FROM categorias WHERE id = ?').bind(orig.categoria_id).first<{ nome: string; cor_hex: string; cor_borda_hex: string; cor_texto_hex: string }>()
     : null;
 
-  return c.json({ ok: true, item: { ...clone, cat_nome: cat?.nome, cat_cor: cat?.cor_hex, cat_cor_borda: cat?.cor_borda_hex, cat_cor_texto: cat?.cor_texto_hex } });
+  const { total, total_itens } = await getTotais(c.env.DB, planilha.id);
+  return c.json({
+    ok: true,
+    item: { ...clone, cat_nome: cat?.nome, cat_cor: cat?.cor_hex, cat_cor_borda: cat?.cor_borda_hex, cat_cor_texto: cat?.cor_texto_hex },
+    total_fmt: fmtBRL(total),
+    total_itens,
+  });
 });
 
 app.post('/:id/agrupar', async (c) => {

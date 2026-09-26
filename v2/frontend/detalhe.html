@@ -159,8 +159,7 @@ async function load() {
   document.title = `SisLicit — ${d.planilha.titulo}`;
   document.getElementById('titulo').textContent = d.planilha.titulo;
   document.getElementById('subtitulo').textContent = [d.planilha.numero_proc, d.planilha.descricao].filter(Boolean).join(' · ');
-  document.getElementById('totalGeral').textContent = d.total_fmt;
-  document.getElementById('totalItens').textContent = `${d.itens.length} item${d.itens.length !== 1 ? 's' : ''}`;
+  updateTotalHeader(d.total_fmt, d.itens.length);
 
   buildCatChips(d.itens);
   document.getElementById('tableBody').innerHTML = '';
@@ -394,6 +393,7 @@ async function clonarItem(itemId) {
     tr.insertAdjacentElement('afterend', newTr);
     toast('Item clonado', 'ok');
     renumberDisplay();
+    updateTotalHeader(d.total_fmt, d.total_itens);
   } else toast(d.error ?? 'Erro', 'err');
 }
 
@@ -404,8 +404,14 @@ async function excluirItem(itemId) {
   if (d.ok) {
     document.querySelector(`tr[data-id="${itemId}"]`)?.remove();
     renumberDisplay();
+    updateTotalHeader(d.total_fmt, d.total_itens);
     toast('Item excluído', 'ok');
   } else toast(d.error ?? 'Erro', 'err');
+}
+
+function updateTotalHeader(total_fmt, total_itens) {
+  document.getElementById('totalGeral').textContent = total_fmt;
+  document.getElementById('totalItens').textContent = `${total_itens} item${total_itens !== 1 ? 's' : ''}`;
 }
 
 function renumberDisplay() {
@@ -446,7 +452,7 @@ async function addItem() {
   const d = await res.json();
   if (d.ok) {
     appendRow(d.item);
-    document.getElementById('totalGeral').textContent = d.total_fmt;
+    updateTotalHeader(d.total_fmt, d.total_itens);
     document.getElementById('tbEmpty').classList.add('hidden');
     ['ni-item','ni-desc','ni-unid'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('ni-qtd').value = '1';
