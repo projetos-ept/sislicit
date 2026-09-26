@@ -55,7 +55,10 @@ app.patch('/users/:id', async (c) => {
   let hash: string | null = null;
   if (password) hash = await hashPassword(password);
 
-  if (role !== undefined && id === me.id) return c.json({ error: 'Não é possível alterar sua própria role' }, 400);
+  if (role !== undefined && id === me.id) {
+    const current = await c.env.DB.prepare('SELECT role FROM users WHERE id = ?').bind(id).first<{ role: string }>();
+    if (current && role !== current.role) return c.json({ error: 'Não é possível alterar sua própria role' }, 400);
+  }
 
   await c.env.DB.prepare(`
     UPDATE users SET
