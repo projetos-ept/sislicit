@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SisLicit — Planilhas</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <script>window.API_BASE = 'https://sislicit-api.projetos-ept.workers.dev';</script>
+</head>
+<body>
+<nav class="navbar">
+  <span class="navbar-brand">Sis<span>Licit</span></span>
+  <div class="navbar-links">
+    <a href="planilhas.html" class="active">Planilhas</a>
+    <a href="admin.html" data-admin-only>Admin</a>
+  </div>
+  <div class="navbar-user">
+    <span id="nav-user"></span>
+    <button class="btn btn-ghost btn-sm" onclick="logout()">Sair</button>
+  </div>
+</nav>
+
+<div class="container">
+  <div class="page-header">
+    <h1>Planilhas</h1>
+    <button class="btn btn-primary" onclick="openNova()">+ Nova planilha</button>
+  </div>
+
+  <!-- Nova planilha panel -->
+  <div id="novaPanel" class="card" style="display:none;margin-bottom:20px;">
+    <div class="card-header">Nova planilha</div>
+    <div class="card-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;align-items:end;">
+        <div class="form-group" style="margin:0">
+          <label class="form-label">Título *</label>
+          <input id="nv-titulo" class="form-control" placeholder="Ex.: Manutenção Predial 2026">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label class="form-label">Nº processo</label>
+          <input id="nv-proc" class="form-control" placeholder="XXXX/2026">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label class="form-label">Descrição</label>
+          <input id="nv-desc" class="form-control" placeholder="Opcional">
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button class="btn btn-primary" onclick="criarPlanilha()">Criar</button>
+        <button class="btn btn-secondary" onclick="closeNova()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="lista" class="card">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Título</th>
+            <th>Nº processo</th>
+            <th>Criado em</th>
+            <th>Atualizado</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div id="empty" class="card-body text-muted hidden" style="text-align:center;padding:40px;">Nenhuma planilha ainda.</div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script src="assets/app.js"></script>
+<script>
+requireAuth();
+
+const fmtDate = (s) => s ? new Date(s.replace(' ','T')+'Z').toLocaleDateString('pt-BR') : '—';
+
+async function load() {
+  const res = await apiFetch('/api/planilhas');
+  const { planilhas } = await res.json();
+  const tbody = document.getElementById('tbody');
+  const empty = document.getElementById('empty');
+  tbody.innerHTML = '';
+  if (!planilhas.length) { empty.classList.remove('hidden'); return; }
+  empty.classList.add('hidden');
+  planilhas.forEach(p => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><a href="detalhe.html?id=${p.id}" style="font-weight:500;">${p.titulo}</a></td>
+      <td class="text-muted mono">${p.numero_proc ?? '—'}</td>
+      <td class="text-muted">${fmtDate(p.criado_em)}</td>
+      <td class="text-muted">${fmtDate(p.atualizado_em)}</td>
+      <td style="text-align:right;">
+        <a href="detalhe.html?id=${p.id}" class="btn btn-secondary btn-sm">Abrir</a>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function openNova()  { document.getElementById('novaPanel').style.display = ''; document.getElementById('nv-titulo').focus(); }
+function closeNova() { document.getElementById('novaPanel').style.display = 'none'; }
+
+async function criarPlanilha() {
+  const titulo = document.getElementById('nv-titulo').value.trim();
+  if (!titulo) { toast('Título obrigatório', 'err'); return; }
+  const res = await apiFetch('/api/planilhas', {
+    method: 'POST',
+    body: JSON.stringify({ titulo, numero_proc: document.getElementById('nv-proc').value.trim() || null, descricao: document.getElementById('nv-desc').value.trim() || null }),
+  });
+  const d = await res.json();
+  if (res.ok) { closeNova(); window.location.href = `detalhe.html?id=${d.planilha.id}`; }
+  else toast(d.error ?? 'Erro', 'err');
+}
+
+load();
+</script>
+</body>
+</html>

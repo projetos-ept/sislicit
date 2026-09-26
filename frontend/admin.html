@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SisLicit — Admin</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <script>window.API_BASE = 'https://sislicit-api.projetos-ept.workers.dev';</script>
+</head>
+<body>
+<nav class="navbar">
+  <span class="navbar-brand">Sis<span>Licit</span></span>
+  <div class="navbar-links">
+    <a href="planilhas.html">Planilhas</a>
+    <a href="admin.html" class="active">Admin</a>
+  </div>
+  <div class="navbar-user">
+    <span id="nav-user"></span>
+    <button class="btn btn-ghost btn-sm" onclick="logout()">Sair</button>
+  </div>
+</nav>
+
+<div class="container">
+  <div class="page-header"><h1>Painel Administrativo</h1></div>
+
+  <!-- Dashboard counters -->
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:28px;" id="counters">
+    <div class="card card-body"><p class="text-muted" style="font-size:0.75rem;text-transform:uppercase;">Planilhas</p><p id="c-planilhas" style="font-size:1.6rem;font-weight:700;">—</p></div>
+    <div class="card card-body"><p class="text-muted" style="font-size:0.75rem;text-transform:uppercase;">Itens</p><p id="c-itens" style="font-size:1.6rem;font-weight:700;">—</p></div>
+    <div class="card card-body"><p class="text-muted" style="font-size:0.75rem;text-transform:uppercase;">Categorias</p><p id="c-categorias" style="font-size:1.6rem;font-weight:700;">—</p></div>
+    <div class="card card-body"><p class="text-muted" style="font-size:0.75rem;text-transform:uppercase;">Usuários</p><p id="c-usuarios" style="font-size:1.6rem;font-weight:700;">—</p></div>
+  </div>
+
+  <!-- Tabs -->
+  <div style="display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:20px;">
+    <button class="btn btn-ghost" id="tab-users" onclick="showTab('users')" style="border-radius:6px 6px 0 0;border-bottom:2px solid var(--accent);">Usuários</button>
+    <button class="btn btn-ghost" id="tab-cats" onclick="showTab('cats')" style="border-radius:6px 6px 0 0;">Categorias</button>
+  </div>
+
+  <!-- USERS section -->
+  <div id="sec-users">
+    <div class="page-header" style="margin-bottom:12px;">
+      <h2 style="font-size:1rem;font-weight:600;">Usuários</h2>
+      <button class="btn btn-primary btn-sm" onclick="openUserForm()">+ Novo usuário</button>
+    </div>
+    <div class="card"><div class="table-wrap"><table>
+      <thead><tr><th>Usuário</th><th>Email</th><th>Role</th><th>Ativo</th><th></th></tr></thead>
+      <tbody id="usersTbody"></tbody>
+    </table></div></div>
+  </div>
+
+  <!-- CATEGORIES section -->
+  <div id="sec-cats" style="display:none;">
+    <div class="page-header" style="margin-bottom:12px;">
+      <h2 style="font-size:1rem;font-weight:600;">Categorias</h2>
+      <button class="btn btn-primary btn-sm" onclick="openCatForm()">+ Nova categoria</button>
+    </div>
+    <div class="card"><div class="table-wrap"><table>
+      <thead><tr><th>Nome</th><th>Cores</th><th></th></tr></thead>
+      <tbody id="catsTbody"></tbody>
+    </table></div></div>
+  </div>
+</div>
+
+<!-- User form modal -->
+<div id="userModal" class="modal-backdrop">
+  <div class="modal">
+    <div class="modal-header"><h3 id="userModalTitle">Novo Usuário</h3><button class="btn btn-ghost" onclick="closeUserForm()">✕</button></div>
+    <input type="hidden" id="u-id">
+    <div class="form-group"><label class="form-label">Usuário</label><input id="u-username" class="form-control"></div>
+    <div class="form-group"><label class="form-label">Email</label><input id="u-email" class="form-control" type="email"></div>
+    <div class="form-group"><label class="form-label">Senha <span id="u-passHint" class="text-muted" style="font-size:0.75rem;">(obrigatória)</span></label><input id="u-password" class="form-control" type="password" placeholder="••••••••"></div>
+    <div class="form-group"><label class="form-label">Role</label>
+      <select id="u-role" class="form-control"><option value="editor">Editor</option><option value="admin">Admin</option></select>
+    </div>
+    <div class="form-group" id="u-ativoWrap" style="display:none;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+        <input type="checkbox" id="u-ativo"> <span class="form-label" style="margin:0;">Ativo</span>
+      </label>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-primary" onclick="saveUser()">Salvar</button>
+      <button class="btn btn-secondary" onclick="closeUserForm()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Category form modal -->
+<div id="catModal" class="modal-backdrop">
+  <div class="modal">
+    <div class="modal-header"><h3 id="catModalTitle">Nova Categoria</h3><button class="btn btn-ghost" onclick="closeCatForm()">✕</button></div>
+    <input type="hidden" id="c-id">
+    <div class="form-group"><label class="form-label">Nome</label><input id="c-nome" class="form-control" placeholder="Ex.: Serviços"></div>
+    <div class="form-group"><label class="form-label">Cor base</label>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input id="c-cor" class="form-control" type="color" value="#6366f1" style="flex:0 0 60px;">
+        <input id="c-cor-text" class="form-control" placeholder="#6366f1" style="flex:1;">
+      </div>
+      <div id="c-preview" style="margin-top:8px;">
+        <span id="c-badge-preview" class="cat-badge" style="background:#6366f1;border-color:#4338ca;color:#1e1b4b;">Preview</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-primary" onclick="saveCat()">Salvar</button>
+      <button class="btn btn-secondary" onclick="closeCatForm()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script src="assets/app.js"></script>
+<script>
+requireAuth();
+if (getUser()?.role !== 'admin') { window.location.href = 'planilhas.html'; }
+
+// ── Load ──────────────────────────────────────────────────────────────────────
+async function loadDashboard() {
+  const res = await apiFetch('/api/admin/dashboard');
+  const d = await res.json();
+  document.getElementById('c-planilhas').textContent  = d.total_planilhas;
+  document.getElementById('c-itens').textContent      = d.total_itens;
+  document.getElementById('c-categorias').textContent = d.total_categorias;
+  document.getElementById('c-usuarios').textContent   = d.total_usuarios;
+}
+
+async function loadUsers() {
+  const res = await apiFetch('/api/admin/users');
+  const { users } = await res.json();
+  const tb = document.getElementById('usersTbody');
+  tb.innerHTML = '';
+  users.forEach(u => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td style="font-weight:500">${u.username}</td><td class="text-muted">${u.email}</td>
+      <td><span class="cat-badge" style="background:${u.role==='admin'?'#4f46e5':'#374151'};border-color:${u.role==='admin'?'#4338ca':'#1f2937'};color:#e2e4f0;">${u.role}</span></td>
+      <td>${u.ativo ? '✅' : '❌'}</td>
+      <td style="text-align:right;display:flex;gap:6px;justify-content:flex-end;">
+        <button class="btn btn-secondary btn-sm" onclick='editUser(${JSON.stringify(u)})'>Editar</button>
+        <button class="btn btn-danger btn-sm" onclick="deactivateUser(${u.id},'${u.username}')">Desativar</button>
+      </td>`;
+    tb.appendChild(tr);
+  });
+}
+
+async function loadCats() {
+  const res = await apiFetch('/api/categorias');
+  const { categorias } = await res.json();
+  const tb = document.getElementById('catsTbody');
+  tb.innerHTML = '';
+  categorias.forEach(c => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td style="font-weight:500">${c.nome}</td>
+      <td><span class="cat-badge" style="background:${c.cor_hex};border-color:${c.cor_borda_hex};color:${c.cor_texto_hex}">${c.nome}</span></td>
+      <td style="text-align:right;display:flex;gap:6px;justify-content:flex-end;">
+        <button class="btn btn-secondary btn-sm" onclick='editCat(${JSON.stringify(c)})'>Editar</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteCat(${c.id},'${c.nome}')">Excluir</button>
+      </td>`;
+    tb.appendChild(tr);
+  });
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+function showTab(tab) {
+  document.getElementById('sec-users').style.display = tab === 'users' ? '' : 'none';
+  document.getElementById('sec-cats').style.display  = tab === 'cats'  ? '' : 'none';
+  document.getElementById('tab-users').style.borderBottom = tab === 'users' ? '2px solid var(--accent)' : 'none';
+  document.getElementById('tab-cats').style.borderBottom  = tab === 'cats'  ? '2px solid var(--accent)' : 'none';
+}
+
+// ── User form ─────────────────────────────────────────────────────────────────
+function openUserForm() {
+  document.getElementById('userModalTitle').textContent = 'Novo Usuário';
+  ['u-id','u-username','u-email','u-password'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('u-role').value = 'editor';
+  document.getElementById('u-passHint').textContent = '(obrigatória)';
+  document.getElementById('u-ativoWrap').style.display = 'none';
+  document.getElementById('userModal').classList.add('open');
+}
+
+function editUser(u) {
+  document.getElementById('userModalTitle').textContent = 'Editar Usuário';
+  document.getElementById('u-id').value       = u.id;
+  document.getElementById('u-username').value = u.username;
+  document.getElementById('u-email').value    = u.email;
+  document.getElementById('u-password').value = '';
+  document.getElementById('u-role').value     = u.role;
+  document.getElementById('u-ativo').checked  = !!u.ativo;
+  document.getElementById('u-passHint').textContent = '(deixe vazio para não alterar)';
+  document.getElementById('u-ativoWrap').style.display = '';
+  document.getElementById('userModal').classList.add('open');
+}
+
+function closeUserForm() { document.getElementById('userModal').classList.remove('open'); }
+
+async function saveUser() {
+  const id = document.getElementById('u-id').value;
+  const body = {
+    username: document.getElementById('u-username').value.trim(),
+    email:    document.getElementById('u-email').value.trim(),
+    role:     document.getElementById('u-role').value,
+  };
+  const pw = document.getElementById('u-password').value;
+  if (pw) body.password = pw;
+  if (id) body.ativo = document.getElementById('u-ativo').checked;
+
+  const res = await apiFetch(id ? `/api/admin/users/${id}` : '/api/admin/users', {
+    method: id ? 'PATCH' : 'POST', body: JSON.stringify(body),
+  });
+  const d = await res.json();
+  if (res.ok) { closeUserForm(); loadUsers(); loadDashboard(); toast('Salvo', 'ok'); }
+  else toast(d.error ?? 'Erro', 'err');
+}
+
+async function deactivateUser(id, name) {
+  if (!confirm(`Desativar "${name}"?`)) return;
+  const res = await apiFetch(`/api/admin/users/${id}`, { method: 'DELETE' });
+  const d = await res.json();
+  if (d.ok) { loadUsers(); toast('Usuário desativado', 'ok'); }
+  else toast(d.error ?? 'Erro', 'err');
+}
+
+// ── Category form ─────────────────────────────────────────────────────────────
+function openCatForm() {
+  document.getElementById('catModalTitle').textContent = 'Nova Categoria';
+  document.getElementById('c-id').value   = '';
+  document.getElementById('c-nome').value = '';
+  document.getElementById('c-cor').value  = '#6366f1';
+  document.getElementById('c-cor-text').value = '#6366f1';
+  updateCatPreview('#6366f1');
+  document.getElementById('catModal').classList.add('open');
+}
+
+function editCat(c) {
+  document.getElementById('catModalTitle').textContent = 'Editar Categoria';
+  document.getElementById('c-id').value   = c.id;
+  document.getElementById('c-nome').value = c.nome;
+  document.getElementById('c-cor').value  = c.cor_hex;
+  document.getElementById('c-cor-text').value = c.cor_hex;
+  updateCatPreview(c.cor_hex, c.cor_borda_hex, c.cor_texto_hex);
+  document.getElementById('catModal').classList.add('open');
+}
+
+function closeCatForm() { document.getElementById('catModal').classList.remove('open'); }
+
+function updateCatPreview(bg, border, text) {
+  // Rough client-side preview; server computes real variants
+  const badge = document.getElementById('c-badge-preview');
+  badge.style.background   = bg;
+  badge.style.borderColor  = border ?? bg;
+  badge.style.color        = text ?? '#fff';
+  badge.textContent        = document.getElementById('c-nome').value || 'Preview';
+}
+
+document.getElementById('c-cor')?.addEventListener('input', (e) => {
+  document.getElementById('c-cor-text').value = e.target.value;
+  updateCatPreview(e.target.value);
+});
+document.getElementById('c-cor-text')?.addEventListener('input', (e) => {
+  if (/^#[0-9a-f]{6}$/i.test(e.target.value)) {
+    document.getElementById('c-cor').value = e.target.value;
+    updateCatPreview(e.target.value);
+  }
+});
+document.getElementById('c-nome')?.addEventListener('input', () => {
+  document.getElementById('c-badge-preview').textContent = document.getElementById('c-nome').value || 'Preview';
+});
+
+async function saveCat() {
+  const id = document.getElementById('c-id').value;
+  const body = {
+    nome:    document.getElementById('c-nome').value.trim(),
+    cor_hex: document.getElementById('c-cor').value,
+  };
+  if (!body.nome) { toast('Nome obrigatório', 'err'); return; }
+  const res = await apiFetch(id ? `/api/categorias/${id}` : '/api/categorias', {
+    method: id ? 'PATCH' : 'POST', body: JSON.stringify(body),
+  });
+  const d = await res.json();
+  if (res.ok) { closeCatForm(); loadCats(); loadDashboard(); toast('Salvo', 'ok'); }
+  else toast(d.error ?? 'Erro', 'err');
+}
+
+async function deleteCat(id, name) {
+  if (!confirm(`Excluir "${name}"?`)) return;
+  const res = await apiFetch(`/api/categorias/${id}`, { method: 'DELETE' });
+  const d = await res.json();
+  if (d.ok) { loadCats(); loadDashboard(); toast('Excluída', 'ok'); }
+  else toast(d.error ?? 'Erro', 'err');
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+loadDashboard(); loadUsers(); loadCats();
+</script>
+</body>
+</html>

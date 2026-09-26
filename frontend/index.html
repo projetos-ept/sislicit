@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SisLicit — Login</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <script>window.API_BASE = 'https://sislicit-api.projetos-ept.workers.dev';</script>
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-card card">
+    <div class="card-body">
+      <h1 style="font-size:1.4rem;font-weight:700;margin-bottom:4px;">Sis<span style="color:var(--accent)">Licit</span></h1>
+      <p class="text-muted" style="font-size:0.82rem;margin-bottom:24px;">Sistema de planilhas para licitação</p>
+
+      <div id="alert" class="alert alert-danger hidden"></div>
+
+      <form id="loginForm">
+        <div class="form-group">
+          <label class="form-label">Usuário</label>
+          <input type="text" id="username" class="form-control" placeholder="seu_usuario" autocomplete="username" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Senha</label>
+          <input type="password" id="password" class="form-control" placeholder="••••••••" autocomplete="current-password" required>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;" id="btnLogin">Entrar</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="assets/app.js"></script>
+<script>
+  // Already logged in? redirect
+  if (getToken()) window.location.href = 'planilhas.html';
+
+  document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('btnLogin');
+    btn.disabled = true; btn.textContent = 'Entrando…';
+
+    const res = await fetch(API_BASE + '/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: document.getElementById('username').value.trim(),
+        password: document.getElementById('password').value,
+      }),
+    });
+    const d = await res.json();
+    if (res.ok) {
+      setAuth(d.token, d.user);
+      window.location.href = 'planilhas.html';
+    } else {
+      const al = document.getElementById('alert');
+      al.textContent = d.error ?? 'Erro ao fazer login';
+      al.classList.remove('hidden');
+      btn.disabled = false; btn.textContent = 'Entrar';
+    }
+  });
+</script>
+</body>
+</html>
