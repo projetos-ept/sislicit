@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SisLicit — Planilha</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <script>window.API_BASE = 'https://sislicit-api.projetos-ept.workers.dev';</script>
+</head>
+<body>
+<nav class="navbar">
+  <span class="navbar-brand">Sis<span>Licit</span></span>
+  <div class="navbar-links">
+    <a href="planilhas.html">Planilhas</a>
+    <a href="admin.html" data-admin-only>Admin</a>
+  </div>
+  <div class="navbar-user">
+    <span id="nav-user"></span>
+    <button class="btn btn-ghost btn-sm" onclick="logout()">Sair</button>
+  </div>
+</nav>
+
+<div class="container">
+  <!-- Header -->
+  <div class="page-header">
+    <div style="flex:1">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <h1 id="titulo">—</h1>
+        <button class="btn btn-ghost btn-sm" onclick="openEditMeta()" title="Editar metadados">✏️</button>
+      </div>
+      <p id="subtitulo" class="text-muted" style="font-size:0.82rem;margin-top:2px;"></p>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn btn-secondary btn-sm" onclick="agrupar()">⊞ Agrupar cat.</button>
+      <a id="btnExcelFull" href="#" class="btn btn-secondary btn-sm" onclick="exportExcel(event)">⬇ Excel</a>
+      <a id="btnJsonFull"  href="#" class="btn btn-secondary btn-sm" onclick="exportJson(event)">⬇ JSON</a>
+    </div>
+  </div>
+
+  <!-- Edit meta modal -->
+  <div id="metaModal" class="modal-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Editar planilha</h3>
+        <button class="btn btn-ghost" onclick="closeEditMeta()">✕</button>
+      </div>
+      <div class="form-group"><label class="form-label">Título</label><input id="m-titulo" class="form-control"></div>
+      <div class="form-group"><label class="form-label">Nº processo</label><input id="m-proc" class="form-control"></div>
+      <div class="form-group"><label class="form-label">Descrição</label><input id="m-desc" class="form-control"></div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-primary" onclick="saveMeta()">Salvar</button>
+        <button class="btn btn-secondary" onclick="closeEditMeta()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Totalizador -->
+  <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:8px;">
+    <span class="text-muted" style="font-size:0.82rem;">Total geral:</span>
+    <span id="totalGeral" class="mono" style="font-size:1.1rem;font-weight:600;color:var(--accent);">R$ 0,00</span>
+    <span id="totalItens" class="text-muted" style="font-size:0.78rem;margin-left:auto;"></span>
+  </div>
+
+  <!-- Bulk bar -->
+  <div id="bulkBar" class="bulk-bar">
+    <span class="bulk-count" id="bulkCount">0 selecionados</span>
+    <button class="btn btn-secondary btn-sm" onclick="bulkExcel()">⬇ Excel</button>
+    <button class="btn btn-secondary btn-sm" onclick="bulkJson()">⬇ JSON</button>
+    <button class="btn btn-danger btn-sm" onclick="bulkDelete()">🗑 Excluir</button>
+  </div>
+
+  <!-- Category filter chips -->
+  <div id="catChips" class="cat-chips"></div>
+
+  <!-- Category dropdown (shared, moved around DOM) -->
+  <div id="catDropdown" class="cat-dropdown" style="display:none;position:fixed;z-index:300;"></div>
+
+  <!-- Table -->
+  <div class="card">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:24px;"><input type="checkbox" id="checkAll" onchange="toggleAll(this.checked)"></th>
+            <th class="col-n">N°</th>
+            <th>Item</th>
+            <th>Descrição</th>
+            <th>Unid.</th>
+            <th>Qtd.<span class="sort-btn" id="sb-qtd" onclick="sortTable('qtd',this,'th-qtd')"><span class="arr-up">▲</span><span class="arr-down">▼</span></span></th>
+            <th id="th-vunit">Vl. Unit.<span class="sort-btn" id="sb-vunit" onclick="sortTable('vunit',this,'th-vunit')"><span class="arr-up">▲</span><span class="arr-down">▼</span></span></th>
+            <th id="th-vtotal">Vl. Total<span class="sort-btn" id="sb-vtotal" onclick="sortTable('vtotal',this,'th-vtotal')"><span class="arr-up">▲</span><span class="arr-down">▼</span></span></th>
+            <th>Categoria</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+    <div id="tbEmpty" class="card-body text-muted hidden" style="text-align:center;padding:32px;">Nenhum item ainda.</div>
+  </div>
+
+  <!-- New item panel -->
+  <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+    <button class="btn btn-primary btn-sm" onclick="toggleNewPanel()">+ Novo item</button>
+    <button class="btn btn-secondary btn-sm" onclick="openJsonModal()">+ Novo item (.json)</button>
+  </div>
+  <div id="newPanel" class="new-item-panel" style="margin-top:12px;">
+    <div class="new-item-grid">
+      <div class="form-group" style="margin:0"><label class="form-label">Item *</label><input id="ni-item" class="form-control" placeholder="Nome do item"></div>
+      <div class="form-group" style="margin:0"><label class="form-label">Descrição</label><input id="ni-desc" class="form-control" placeholder="Opcional"></div>
+      <div class="form-group" style="margin:0"><label class="form-label">Unid.</label><input id="ni-unid" class="form-control" placeholder="UN"></div>
+      <div class="form-group" style="margin:0"><label class="form-label">Qtd.</label><input id="ni-qtd" class="form-control" type="number" min="0" value="1"></div>
+      <div class="form-group" style="margin:0"><label class="form-label">Vl. Unit.</label><input id="ni-vu" class="form-control" type="number" min="0" step="0.01" value="0"></div>
+      <div class="form-group" style="margin:0"><label class="form-label">Total</label><input id="ni-vt" class="form-control mono" readonly value="R$ 0,00"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px;">
+      <button class="btn btn-primary btn-sm" onclick="addItem()">Adicionar</button>
+      <button class="btn btn-secondary btn-sm" onclick="toggleNewPanel()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- JSON import modal -->
+<div id="jsonModal" class="modal-backdrop">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Importar JSON</h3>
+      <button class="btn btn-ghost" onclick="closeJsonModal()">✕</button>
+    </div>
+    <p class="text-muted" style="font-size:0.82rem;margin-bottom:12px;">Cole uma lista <code>[{...}]</code> ou <code>{"itens":[...]}</code>. Máximo 40 itens.</p>
+    <textarea id="jsonText" class="form-control" rows="10" placeholder='[{"item":"Nome","unidade":"UN","quantidade":1,"valor_unitario":10}]'></textarea>
+    <div style="display:flex;gap:8px;margin-top:12px;">
+      <button class="btn btn-primary" onclick="importJson()">Importar</button>
+      <button class="btn btn-secondary" onclick="closeJsonModal()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script src="assets/app.js"></script>
+<script>
+requireAuth();
+
+const PID = new URLSearchParams(location.search).get('id');
+if (!PID) location.href = 'planilhas.html';
+
+let CATS = [];
+let _sortState = { col: null, dir: null };
+let selectedCat = null;
+const pendingChanges = new Map(); // itemId -> { campo: valor }
+
+// ── Load ──────────────────────────────────────────────────────────────────────
+async function load() {
+  const res = await apiFetch(`/api/planilhas/${PID}`);
+  if (!res.ok) { toast('Erro ao carregar planilha', 'err'); return; }
+  const d = await res.json();
+  CATS = d.categorias ?? [];
+
+  document.title = `SisLicit — ${d.planilha.titulo}`;
+  document.getElementById('titulo').textContent = d.planilha.titulo;
+  document.getElementById('subtitulo').textContent = [d.planilha.numero_proc, d.planilha.descricao].filter(Boolean).join(' · ');
+  document.getElementById('totalGeral').textContent = d.total_fmt;
+  document.getElementById('totalItens').textContent = `${d.itens.length} item${d.itens.length !== 1 ? 's' : ''}`;
+
+  buildCatChips(d.itens);
+  document.getElementById('tableBody').innerHTML = '';
+  d.itens.forEach(it => appendRow(it));
+  document.getElementById('tbEmpty').classList.toggle('hidden', d.itens.length > 0);
+}
+
+// ── Category chips ────────────────────────────────────────────────────────────
+function buildCatChips(itens) {
+  const seen = new Map();
+  itens.forEach(it => {
+    if (it.cat_nome && !seen.has(it.categoria_id))
+      seen.set(it.categoria_id, { nome: it.cat_nome, cor: it.cat_cor, borda: it.cat_cor_borda, texto: it.cat_cor_texto });
+  });
+  const wrap = document.getElementById('catChips');
+  wrap.innerHTML = '';
+  seen.forEach((cat, id) => {
+    const chip = document.createElement('button');
+    chip.className = 'cat-chip';
+    chip.dataset.cat = id;
+    chip.textContent = cat.nome;
+    chip.style.cssText = `background:${cat.cor};border-color:${cat.borda};color:${cat.texto}`;
+    chip.onclick = () => toggleCat(chip, id);
+    wrap.appendChild(chip);
+  });
+}
+
+function toggleCat(chip, catId) {
+  const c = String(catId);
+  if (selectedCat === c) {
+    selectedCat = null;
+    chip.classList.remove('active');
+  } else {
+    document.querySelectorAll('.cat-chip').forEach(ch => ch.classList.remove('active'));
+    selectedCat = c;
+    chip.classList.add('active');
+  }
+  document.querySelectorAll('#tableBody tr[data-id]').forEach(tr => {
+    tr.style.display = (!selectedCat || tr.dataset.cat === selectedCat) ? '' : 'none';
+  });
+}
+
+// ── Build row ─────────────────────────────────────────────────────────────────
+function appendRow(it) {
+  const tr = document.createElement('tr');
+  tr.dataset.id  = it.id;
+  tr.dataset.cat = it.categoria_id ?? '';
+  tr.innerHTML = buildRowHTML(it);
+  attachRowEvents(tr, it.id);
+  document.getElementById('tableBody').appendChild(tr);
+}
+
+function buildRowHTML(it) {
+  const catBadge = it.cat_nome
+    ? `<span class="cat-badge" style="background:${it.cat_cor};border-color:${it.cat_cor_borda};color:${it.cat_cor_texto}"
+         onclick="openCatDropdown(event,${it.id})">${it.cat_nome}</span>`
+    : `<span class="cat-none" onclick="openCatDropdown(event,${it.id})">— categoria</span>`;
+  return `
+    <td><input type="checkbox" class="row-check" data-id="${it.id}" onchange="updateBulkBar()"></td>
+    <td class="col-n">${it.n}</td>
+    <td><span class="cell-display" data-campo="item" data-id="${it.id}">${it.item}</span></td>
+    <td><span class="cell-display" data-campo="descricao" data-id="${it.id}">${it.descricao ?? ''}</span></td>
+    <td><span class="cell-display" data-campo="unidade" data-id="${it.id}">${it.unidade ?? ''}</span></td>
+    <td><span class="cell-display num" data-campo="quantidade" data-id="${it.id}">${it.quantidade}</span></td>
+    <td><span class="cell-display num" data-campo="valor_unitario" data-id="${it.id}">${it.valor_unitario}</span></td>
+    <td data-vtotal data-raw="${it.valor_total ?? 0}"><span class="cell-display num">${fmtBRL(it.valor_total)}</span></td>
+    <td class="cat-zone" data-id="${it.id}">${catBadge}</td>
+    <td class="col-actions">
+      <button class="btn btn-ghost btn-sm" title="Clonar" onclick="clonarItem(${it.id})">⧉</button>
+      <button class="btn btn-ghost btn-sm" title="Excluir" style="color:var(--danger)" onclick="excluirItem(${it.id})">🗑</button>
+    </td>`;
+}
+
+function attachRowEvents(tr, itemId) {
+  // Click on cell-display → activate inline edit
+  tr.querySelectorAll('.cell-display').forEach(span => {
+    span.addEventListener('click', () => activateCell(span, itemId));
+  });
+
+  // Row-level focusout → sync if dirty
+  tr.addEventListener('focusout', (e) => {
+    if (tr.contains(e.relatedTarget)) return;
+    flushRow(itemId);
+  });
+}
+
+function activateCell(span, itemId) {
+  if (span.querySelector('input')) return;
+  const campo = span.dataset.campo;
+  const isNum = span.classList.contains('num');
+  const current = isNum
+    ? (pendingChanges.get(itemId)?.[campo] ?? span.textContent.trim())
+    : (pendingChanges.get(itemId)?.[campo] ?? span.textContent.trim());
+
+  const input = document.createElement('input');
+  input.type = isNum ? 'number' : 'text';
+  input.className = 'cell-input' + (isNum ? ' num' : '');
+  input.value = current;
+  input.style.width = Math.max(span.offsetWidth, 60) + 'px';
+
+  span.innerHTML = '';
+  span.appendChild(input);
+  input.focus();
+  input.select();
+
+  input.addEventListener('input', () => {
+    if (!pendingChanges.has(itemId)) pendingChanges.set(itemId, {});
+    pendingChanges.get(itemId)[campo] = isNum ? parseFloat(input.value) || 0 : input.value;
+    // Live total preview
+    if (campo === 'quantidade' || campo === 'valor_unitario') updateLiveTotal(input.closest('tr'), itemId);
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { input.blur(); }
+    if (e.key === 'Escape') {
+      // Discard changes for this cell
+      const changes = pendingChanges.get(itemId);
+      if (changes) delete changes[campo];
+      restoreCellDisplay(span, campo, current);
+    }
+  });
+
+  // blur is handled by row focusout
+}
+
+function restoreCellDisplay(span, campo, value) {
+  const isNum = ['quantidade','valor_unitario'].includes(campo);
+  span.innerHTML = '';
+  span.textContent = value;
+}
+
+function updateLiveTotal(tr, itemId) {
+  const changes = pendingChanges.get(itemId) ?? {};
+  const qtd = changes.quantidade  ?? parseFloat(tr.querySelector('[data-campo="quantidade"]')?.textContent ?? '0');
+  const vu  = changes.valor_unitario ?? parseFloat(tr.querySelector('[data-campo="valor_unitario"]')?.textContent ?? '0');
+  const vt  = qtd * vu;
+  const vtTd = tr.querySelector('[data-vtotal]');
+  if (vtTd) { vtTd.querySelector('.cell-display').textContent = fmtBRL(vt); vtTd.dataset.raw = vt; }
+}
+
+// ── Row sync ──────────────────────────────────────────────────────────────────
+async function flushRow(itemId) {
+  const changes = pendingChanges.get(itemId);
+  if (!changes || Object.keys(changes).length === 0) return;
+  pendingChanges.delete(itemId);
+
+  const tr = document.querySelector(`tr[data-id="${itemId}"]`);
+  tr?.classList.add('saving');
+
+  const res = await apiFetch(`/api/planilhas/${PID}/itens/${itemId}`, {
+    method: 'PATCH', body: JSON.stringify(changes),
+  });
+  const d = await res.json();
+  tr?.classList.remove('saving');
+
+  if (d.ok && d.item) {
+    // Refresh row display from server response
+    tr.dataset.cat = d.item.categoria_id ?? '';
+    tr.querySelectorAll('.cell-display[data-campo]').forEach(span => {
+      const c = span.dataset.campo;
+      if (d.item[c] !== undefined) span.textContent = d.item[c] ?? '';
+    });
+    const vtTd = tr.querySelector('[data-vtotal]');
+    if (vtTd) { vtTd.querySelector('.cell-display').textContent = d.valor_total_fmt; vtTd.dataset.raw = d.valor_total; }
+    document.getElementById('totalGeral').textContent = d.planilha_total_fmt;
+  } else {
+    toast(d.error ?? 'Erro ao salvar', 'err');
+  }
+}
+
+// ── Category dropdown ─────────────────────────────────────────────────────────
+let _catDropTarget = null;
+
+function openCatDropdown(e, itemId) {
+  e.stopPropagation();
+  _catDropTarget = itemId;
+  const dd = document.getElementById('catDropdown');
+  dd.innerHTML = `<button onclick="setCategoria(${itemId},null)">— Sem categoria</button>` +
+    CATS.map(c => `<button onclick="setCategoria(${itemId},${c.id})"
+      style="border-left:3px solid ${c.cor_borda_hex};padding-left:8px;">${c.nome}</button>`).join('');
+  const rect = e.currentTarget.getBoundingClientRect();
+  dd.style.cssText = `display:block;top:${rect.bottom + window.scrollY + 4}px;left:${rect.left + window.scrollX}px;position:absolute;`;
+}
+
+document.addEventListener('click', (e) => {
+  if (!document.getElementById('catDropdown').contains(e.target)) {
+    document.getElementById('catDropdown').style.display = 'none';
+  }
+});
+
+async function setCategoria(itemId, catId) {
+  document.getElementById('catDropdown').style.display = 'none';
+  const res = await apiFetch(`/api/planilhas/${PID}/itens/${itemId}`, {
+    method: 'PATCH', body: JSON.stringify({ categoria_id: catId }),
+  });
+  const d = await res.json();
+  if (d.ok && d.item) {
+    const tr = document.querySelector(`tr[data-id="${itemId}"]`);
+    tr.dataset.cat = catId ?? '';
+    const zone = tr.querySelector('.cat-zone');
+    if (catId && d.item.cat_nome) {
+      zone.innerHTML = `<span class="cat-badge" style="background:${d.item.cat_cor};border-color:${d.item.cat_cor_borda};color:${d.item.cat_cor_texto}"
+        onclick="openCatDropdown(event,${itemId})">${d.item.cat_nome}</span>`;
+    } else {
+      zone.innerHTML = `<span class="cat-none" onclick="openCatDropdown(event,${itemId})">— categoria</span>`;
+    }
+    // Rebuild chips
+    const allRows = Array.from(document.querySelectorAll('#tableBody tr[data-id]'));
+    const itens = allRows.map(r => ({
+      categoria_id: r.dataset.cat || null,
+      cat_nome: r.querySelector('.cat-badge')?.textContent,
+      cat_cor: r.querySelector('.cat-badge')?.style.background,
+      cat_cor_borda: r.querySelector('.cat-badge')?.style.borderColor,
+      cat_cor_texto: r.querySelector('.cat-badge')?.style.color,
+    })).filter(i => i.cat_nome);
+    buildCatChips(itens);
+  }
+}
+
+// ── Item actions ──────────────────────────────────────────────────────────────
+async function clonarItem(itemId) {
+  const res = await apiFetch(`/api/planilhas/${PID}/itens/${itemId}/clonar`, { method: 'POST' });
+  const d = await res.json();
+  if (d.ok) {
+    const tr = document.querySelector(`tr[data-id="${itemId}"]`);
+    const newTr = document.createElement('tr');
+    newTr.dataset.id = d.item.id;
+    newTr.dataset.cat = d.item.categoria_id ?? '';
+    newTr.innerHTML = buildRowHTML(d.item);
+    attachRowEvents(newTr, d.item.id);
+    tr.insertAdjacentElement('afterend', newTr);
+    toast('Item clonado', 'ok');
+    renumberDisplay();
+  } else toast(d.error ?? 'Erro', 'err');
+}
+
+async function excluirItem(itemId) {
+  if (!confirm('Excluir item?')) return;
+  const res = await apiFetch(`/api/planilhas/${PID}/itens/${itemId}`, { method: 'DELETE' });
+  const d = await res.json();
+  if (d.ok) {
+    document.querySelector(`tr[data-id="${itemId}"]`)?.remove();
+    renumberDisplay();
+    toast('Item excluído', 'ok');
+  } else toast(d.error ?? 'Erro', 'err');
+}
+
+function renumberDisplay() {
+  document.querySelectorAll('#tableBody tr[data-id]').forEach((tr, i) => {
+    const nTd = tr.querySelector('.col-n');
+    if (nTd) nTd.textContent = i + 1;
+  });
+}
+
+// ── Add item ──────────────────────────────────────────────────────────────────
+function toggleNewPanel() {
+  const p = document.getElementById('newPanel');
+  p.classList.toggle('open');
+  if (p.classList.contains('open')) document.getElementById('ni-item').focus();
+}
+
+document.getElementById?.('ni-qtd')?.addEventListener('input', previewTotal);
+document.getElementById?.('ni-vu')?.addEventListener('input', previewTotal);
+function previewTotal() {
+  const qtd = parseFloat(document.getElementById('ni-qtd').value) || 0;
+  const vu  = parseFloat(document.getElementById('ni-vu').value)  || 0;
+  document.getElementById('ni-vt').value = fmtBRL(qtd * vu);
+}
+
+async function addItem() {
+  const item = document.getElementById('ni-item').value.trim();
+  if (!item) { toast('Nome obrigatório', 'err'); return; }
+  const res = await apiFetch(`/api/planilhas/${PID}/itens`, {
+    method: 'POST',
+    body: JSON.stringify({
+      item,
+      descricao:      document.getElementById('ni-desc').value.trim() || null,
+      unidade:        document.getElementById('ni-unid').value.trim() || null,
+      quantidade:     parseFloat(document.getElementById('ni-qtd').value) || 0,
+      valor_unitario: parseFloat(document.getElementById('ni-vu').value)  || 0,
+    }),
+  });
+  const d = await res.json();
+  if (d.ok) {
+    appendRow(d.item);
+    document.getElementById('totalGeral').textContent = d.total_fmt;
+    document.getElementById('tbEmpty').classList.add('hidden');
+    ['ni-item','ni-desc','ni-unid'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('ni-qtd').value = '1';
+    document.getElementById('ni-vu').value  = '0';
+    document.getElementById('ni-vt').value  = fmtBRL(0);
+    toast('Item adicionado', 'ok');
+  } else toast(d.error ?? 'Erro', 'err');
+}
+
+// ── JSON import modal ─────────────────────────────────────────────────────────
+function openJsonModal()  { document.getElementById('jsonModal').classList.add('open'); }
+function closeJsonModal() { document.getElementById('jsonModal').classList.remove('open'); }
+
+async function importJson() {
+  let body;
+  try { body = JSON.parse(document.getElementById('jsonText').value); }
+  catch { toast('JSON inválido', 'err'); return; }
+  const res = await apiFetch(`/api/planilhas/${PID}/import/json`, {
+    method: 'POST', body: JSON.stringify(body),
+  });
+  const d = await res.json();
+  if (d.ok) { closeJsonModal(); load(); toast(`${d.importados} item(s) importado(s)`, 'ok'); }
+  else toast(d.error ?? 'Erro', 'err');
+}
+
+// ── Meta edit ─────────────────────────────────────────────────────────────────
+function openEditMeta() {
+  document.getElementById('m-titulo').value = document.getElementById('titulo').textContent;
+  document.getElementById('metaModal').classList.add('open');
+}
+function closeEditMeta() { document.getElementById('metaModal').classList.remove('open'); }
+
+async function saveMeta() {
+  const res = await apiFetch(`/api/planilhas/${PID}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      titulo:      document.getElementById('m-titulo').value.trim() || null,
+      numero_proc: document.getElementById('m-proc').value.trim()   || null,
+      descricao:   document.getElementById('m-desc').value.trim()   || null,
+    }),
+  });
+  if ((await res.json()).ok) { closeEditMeta(); load(); toast('Salvo', 'ok'); }
+}
+
+// ── Agrupar ───────────────────────────────────────────────────────────────────
+async function agrupar() {
+  const res = await apiFetch(`/api/planilhas/${PID}/agrupar`, { method: 'POST' });
+  if ((await res.json()).ok) { load(); toast('Agrupado', 'ok'); }
+}
+
+// ── Sort ──────────────────────────────────────────────────────────────────────
+function sortTable(col, btn, thId) {
+  const tbody = document.getElementById('tableBody');
+  const rows  = Array.from(tbody.querySelectorAll('tr[data-id]'));
+
+  if (_sortState.col === col) {
+    if (_sortState.dir === 'asc') { _sortState.dir = 'desc'; }
+    else {
+      _sortState = { col: null, dir: null };
+      rows.sort((a, b) => parseInt(a.querySelector('.col-n')?.textContent||'0') - parseInt(b.querySelector('.col-n')?.textContent||'0'));
+      rows.forEach(r => tbody.appendChild(r));
+      document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('asc','desc'));
+      document.querySelectorAll('thead th').forEach(t => t.classList.remove('sorted'));
+      return;
+    }
+  } else { _sortState = { col, dir: 'asc' }; }
+
+  document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('asc','desc'));
+  document.querySelectorAll('thead th').forEach(t => t.classList.remove('sorted'));
+  btn.classList.add(_sortState.dir);
+  document.getElementById(thId)?.classList.add('sorted');
+
+  rows.sort((a, b) => {
+    let va = 0, vb = 0;
+    if (col === 'qtd') {
+      va = parseFloat(a.querySelector('[data-campo="quantidade"]')?.textContent ?? '0');
+      vb = parseFloat(b.querySelector('[data-campo="quantidade"]')?.textContent ?? '0');
+    } else if (col === 'vunit') {
+      va = parseFloat(a.querySelector('[data-campo="valor_unitario"]')?.textContent ?? '0');
+      vb = parseFloat(b.querySelector('[data-campo="valor_unitario"]')?.textContent ?? '0');
+    } else {
+      va = parseFloat(a.querySelector('[data-vtotal]')?.dataset.raw ?? '0');
+      vb = parseFloat(b.querySelector('[data-vtotal]')?.dataset.raw ?? '0');
+    }
+    return _sortState.dir === 'asc' ? va - vb : vb - va;
+  });
+  rows.forEach(r => tbody.appendChild(r));
+}
+
+// ── Bulk ──────────────────────────────────────────────────────────────────────
+function toggleAll(checked) {
+  document.querySelectorAll('.row-check').forEach(cb => cb.checked = checked);
+  updateBulkBar();
+}
+
+function updateBulkBar() {
+  const n = document.querySelectorAll('.row-check:checked').length;
+  document.getElementById('bulkBar').classList.toggle('visible', n > 0);
+  document.getElementById('bulkCount').textContent = `${n} selecionado${n !== 1 ? 's' : ''}`;
+}
+
+function getSelectedIds() {
+  return Array.from(document.querySelectorAll('.row-check:checked')).map(cb => Number(cb.dataset.id));
+}
+
+async function bulkDelete() {
+  const ids = getSelectedIds();
+  if (!ids.length || !confirm(`Excluir ${ids.length} item(s)?`)) return;
+  const res = await apiFetch(`/api/planilhas/${PID}/bulk/excluir`, { method: 'POST', body: JSON.stringify({ ids }) });
+  const d = await res.json();
+  if (d.ok) { load(); toast(`${ids.length} item(s) excluído(s)`, 'ok'); }
+  else toast(d.error ?? 'Erro', 'err');
+}
+
+async function bulkExcel() {
+  const ids = getSelectedIds();
+  if (!ids.length) return;
+  const res = await apiFetch(`/api/planilhas/${PID}/bulk/xlsx`, { method: 'POST', body: JSON.stringify({ ids }) });
+  const blob = await res.blob();
+  downloadBlob(blob, 'selecao.xlsx');
+}
+
+async function bulkJson() {
+  const ids = getSelectedIds();
+  if (!ids.length) return;
+  const res = await apiFetch(`/api/planilhas/${PID}/bulk/json`, { method: 'POST', body: JSON.stringify({ ids }) });
+  const blob = await res.blob();
+  downloadBlob(blob, 'selecao.json');
+}
+
+async function exportExcel(e) {
+  e.preventDefault();
+  const res = await apiFetch(`/api/planilhas/${PID}/export/excel`);
+  const blob = await res.blob();
+  downloadBlob(blob, 'planilha.xlsx');
+}
+
+async function exportJson(e) {
+  e.preventDefault();
+  const res = await apiFetch(`/api/planilhas/${PID}/export/json`);
+  const blob = await res.blob();
+  downloadBlob(blob, 'planilha.json');
+}
+
+function downloadBlob(blob, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+}
+
+// ── Preview totals on new item ────────────────────────────────────────────────
+document.getElementById('ni-qtd')?.addEventListener('input', previewTotal);
+document.getElementById('ni-vu')?.addEventListener('input', previewTotal);
+
+load();
+</script>
+</body>
+</html>
