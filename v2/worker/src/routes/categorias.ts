@@ -11,9 +11,6 @@ app.get('/', async (c) => {
 });
 
 app.post('/', async (c) => {
-  const user = c.get('user') as JWTPayload;
-  if (user.role !== 'admin') return c.json({ error: 'Sem permissão' }, 403);
-
   const { nome, cor_hex, rotulo_oculto } = await c.req.json<{ nome: string; cor_hex: string; rotulo_oculto?: string }>();
   if (!nome?.trim() || !cor_hex) return c.json({ error: 'Campos obrigatórios' }, 400);
 
