@@ -125,9 +125,10 @@
         </select>
       </div>
     </div>
-    <div id="ni-novaCat" style="display:none;gap:8px;align-items:end;margin-top:8px;">
+    <div id="ni-novaCat" style="display:none;gap:8px;align-items:end;flex-wrap:wrap;margin-top:8px;">
       <div class="form-group" style="margin:0"><label class="form-label">Nome da categoria</label><input id="ni-cat-nome" class="form-control" placeholder="Ex.: Mobiliário"></div>
-      <div class="form-group" style="margin:0"><label class="form-label">Cor</label><input id="ni-cat-cor" type="color" class="form-control" value="#6366f1" style="padding:2px;height:38px;"></div>
+      <div class="form-group" style="margin:0"><label class="form-label">Cor</label><input id="ni-cat-cor" type="color" class="form-control" value="#BFDBFE" style="padding:2px;height:38px;"></div>
+      <div id="ni-cat-palette" class="palette-swatches" style="margin-top:0;"></div>
       <button class="btn btn-secondary btn-sm" onclick="criarCategoriaInline()">Criar</button>
     </div>
     <div style="display:flex;gap:8px;margin-top:12px;">
@@ -524,11 +525,13 @@ function onNiCatChange() {
   const painel = document.getElementById('ni-novaCat');
   if (sel.value === '__nova__') {
     painel.style.display = 'flex';
+    document.getElementById('ni-cat-cor').value = proximaCorPalette(CATS.length);
     document.getElementById('ni-cat-nome').focus();
   } else {
     painel.style.display = 'none';
   }
 }
+renderCategoriaPalette(document.getElementById('ni-cat-palette'), hex => { document.getElementById('ni-cat-cor').value = hex; });
 
 async function criarCategoriaInline() {
   const nome = document.getElementById('ni-cat-nome').value.trim();

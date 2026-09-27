@@ -6,6 +6,64 @@
 // <script>window.API_BASE = 'https://sislicit-api.projetos-ept.workers.dev';</script>
 const API_BASE = window.API_BASE ?? '';
 
+// ── Paleta padrão de cores para categorias ───────────────────────────────────────
+// Tons claros/pastel: o backend (calcularVariantes) escurece/satura pra gerar
+// borda e texto legíveis a partir dessa cor base, então cores claras aqui
+// resultam em selos e linhas "claras com texto escuro", nao blocos saturados.
+const CATEGORIA_PALETTE = [
+  { nome: 'Azul',     hex: '#BFDBFE' },
+  { nome: 'Amarelo',  hex: '#FEF08A' },
+  { nome: 'Laranja',  hex: '#FED7AA' },
+  { nome: 'Cinza',    hex: '#E5E7EB' },
+  { nome: 'Verde',    hex: '#BBF7D0' },
+  { nome: 'Vermelho', hex: '#FECACA' },
+  { nome: 'Roxo',     hex: '#DDD6FE' },
+  { nome: 'Ciano',    hex: '#A5F3FC' },
+];
+
+// Renderiza os círculos de cor dentro de `container` (um elemento já no DOM) e
+// chama `onPick(hex)` quando um deles é clicado.
+function renderCategoriaPalette(container, onPick) {
+  container.innerHTML = CATEGORIA_PALETTE.map(c =>
+    `<button type="button" class="palette-swatch" title="${c.nome}" data-hex="${c.hex}" style="background:${c.hex}"></button>`
+  ).join('');
+  container.querySelectorAll('.palette-swatch').forEach(btn => {
+    btn.addEventListener('click', () => onPick(btn.dataset.hex));
+  });
+}
+
+// Escolhe a próxima cor da paleta em rotação, com base em quantas categorias
+// já existem — assim, categorias novas nao nascem todas com a mesma cor.
+function proximaCorPalette(totalCategoriasExistentes) {
+  return CATEGORIA_PALETTE[totalCategoriasExistentes % CATEGORIA_PALETTE.length].hex;
+}
+
+// Porta de calcularVariantes() do worker (src/utils.ts) — só pra prévia no
+// cliente antes de salvar; o valor real que fica salvo é sempre recalculado
+// pelo servidor.
+function calcularVariantesPreview(corHex) {
+  const h = corHex.replace('#', '');
+  const r = parseInt(h.slice(0,2),16)/255, g = parseInt(h.slice(2,4),16)/255, b = parseInt(h.slice(4,6),16)/255;
+  const max = Math.max(r,g,b), min = Math.min(r,g,b), d = max - min;
+  let hue = 0;
+  if (d !== 0) {
+    if (max === r) hue = ((g - b) / d) % 6;
+    else if (max === g) hue = (b - r) / d + 2;
+    else hue = (r - g) / d + 4;
+    hue = hue / 6;
+    if (hue < 0) hue += 1;
+  }
+  const s = max === 0 ? 0 : d / max, v = max;
+  const hsvToHex = (hh, ss, vv) => {
+    const f = (n) => { const k = (n + hh * 6) % 6; return vv - vv * ss * Math.max(0, Math.min(k, 4 - k, 1)); };
+    return '#' + [f(5), f(3), f(1)].map(x => Math.round(x * 255).toString(16).padStart(2, '0')).join('');
+  };
+  return {
+    cor_borda_hex: hsvToHex(hue, Math.min(1, s + 0.20), Math.max(0, v - 0.15)),
+    cor_texto_hex: hsvToHex(hue, Math.min(1, s + 0.40), Math.max(0, v - 0.45)),
+  };
+}
+
 // ── Theme (dark/light) ──────────────────────────────────────────────────────────
 // Aplicado assim que o script carrega, antes do DOMContentLoaded, pra evitar flash.
 (function () {

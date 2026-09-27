@@ -115,11 +115,12 @@
     <div class="form-group"><label class="form-label">Nome</label><input id="c-nome" class="form-control" placeholder="Ex.: Serviços"></div>
     <div class="form-group"><label class="form-label">Cor base</label>
       <div style="display:flex;gap:8px;align-items:center;">
-        <input id="c-cor" class="form-control" type="color" value="#6366f1" style="flex:0 0 60px;">
-        <input id="c-cor-text" class="form-control" placeholder="#6366f1" style="flex:1;">
+        <input id="c-cor" class="form-control" type="color" value="#BFDBFE" style="flex:0 0 60px;">
+        <input id="c-cor-text" class="form-control" placeholder="#BFDBFE" style="flex:1;">
       </div>
+      <div id="c-palette" class="palette-swatches"></div>
       <div id="c-preview" style="margin-top:8px;">
-        <span id="c-badge-preview" class="cat-badge" style="background:#6366f1;border-color:#4338ca;color:#1e1b4b;">Preview</span>
+        <span id="c-badge-preview" class="cat-badge" style="background:#BFDBFE;border-color:#77a2d8;color:#31598b;">Preview</span>
       </div>
     </div>
     <div style="display:flex;gap:8px;">
@@ -253,9 +254,11 @@ function openCatForm() {
   document.getElementById('catModalTitle').textContent = 'Nova Categoria';
   document.getElementById('c-id').value   = '';
   document.getElementById('c-nome').value = '';
-  document.getElementById('c-cor').value  = '#6366f1';
-  document.getElementById('c-cor-text').value = '#6366f1';
-  updateCatPreview('#6366f1');
+  const cor = proximaCorPalette(document.querySelectorAll('#catsTbody tr').length);
+  document.getElementById('c-cor').value  = cor;
+  document.getElementById('c-cor-text').value = cor;
+  const { cor_borda_hex, cor_texto_hex } = calcularVariantesPreview(cor);
+  updateCatPreview(cor, cor_borda_hex, cor_texto_hex);
   document.getElementById('catModal').classList.add('open');
 }
 
@@ -280,15 +283,17 @@ function updateCatPreview(bg, border, text) {
   badge.textContent        = document.getElementById('c-nome').value || 'Preview';
 }
 
-document.getElementById('c-cor')?.addEventListener('input', (e) => {
-  document.getElementById('c-cor-text').value = e.target.value;
-  updateCatPreview(e.target.value);
-});
+function escolherCorCat(hex) {
+  document.getElementById('c-cor').value = hex;
+  document.getElementById('c-cor-text').value = hex;
+  const { cor_borda_hex, cor_texto_hex } = calcularVariantesPreview(hex);
+  updateCatPreview(hex, cor_borda_hex, cor_texto_hex);
+}
+renderCategoriaPalette(document.getElementById('c-palette'), escolherCorCat);
+
+document.getElementById('c-cor')?.addEventListener('input', (e) => escolherCorCat(e.target.value));
 document.getElementById('c-cor-text')?.addEventListener('input', (e) => {
-  if (/^#[0-9a-f]{6}$/i.test(e.target.value)) {
-    document.getElementById('c-cor').value = e.target.value;
-    updateCatPreview(e.target.value);
-  }
+  if (/^#[0-9a-f]{6}$/i.test(e.target.value)) escolherCorCat(e.target.value);
 });
 document.getElementById('c-nome')?.addEventListener('input', () => {
   document.getElementById('c-badge-preview').textContent = document.getElementById('c-nome').value || 'Preview';

@@ -247,6 +247,15 @@ td.col-actions { text-align: right; white-space: nowrap; }
 .cat-none { color: var(--text-muted); font-size: 0.78rem; cursor: pointer; }
 .cat-none:hover { color: var(--text); }
 
+/* ── Paleta de cores padrão (categorias) ─────────────────────────────────── */
+.palette-swatches { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.palette-swatch {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 1px solid var(--border); cursor: pointer; padding: 0;
+  transition: transform 0.1s;
+}
+.palette-swatch:hover { transform: scale(1.15); border-color: var(--text); }
+
 /* ── Category filter chips ───────────────────────────────────────────────── */
 .cat-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
 .cat-chip {
