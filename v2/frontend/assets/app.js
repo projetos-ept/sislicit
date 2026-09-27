@@ -6,6 +6,41 @@
 // <script>window.API_BASE = 'https://sislicit-api.projetos-ept.workers.dev';</script>
 const API_BASE = window.API_BASE ?? '';
 
+// ── Theme (dark/light) ──────────────────────────────────────────────────────────
+// Aplicado assim que o script carrega, antes do DOMContentLoaded, pra evitar flash.
+(function () {
+  let saved = 'dark';
+  try { saved = localStorage.getItem('sl_theme') || 'dark'; } catch {}
+  document.documentElement.setAttribute('data-theme', saved);
+})();
+
+function toggleTheme() {
+  const cur = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  const next = cur === 'light' ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', next);
+  try { localStorage.setItem('sl_theme', next); } catch {}
+  document.querySelectorAll('.theme-toggle').forEach(btn => btn.textContent = next === 'light' ? '🌙' : '☀️');
+}
+
+function initThemeToggle() {
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'theme-toggle';
+  btn.title = 'Alternar tema claro/escuro';
+  btn.textContent = isLight ? '🌙' : '☀️';
+  btn.onclick = toggleTheme;
+
+  const navUser = document.querySelector('.navbar-user');
+  if (navUser) navUser.prepend(btn);
+  else {
+    btn.style.position = 'fixed';
+    btn.style.top = '16px';
+    btn.style.right = '16px';
+    document.body.appendChild(btn);
+  }
+}
+
 // ── Auth ──────────────────────────────────────────────────────────────────────
 function getToken()  { return localStorage.getItem('sl_token'); }
 function getUser()   { try { return JSON.parse(localStorage.getItem('sl_user') ?? 'null'); } catch { return null; } }
@@ -62,4 +97,4 @@ function initNavbar() {
   });
 }
 
-document.addEventListener('DOMContentLoaded', initNavbar);
+document.addEventListener('DOMContentLoaded', () => { initNavbar(); initThemeToggle(); });
