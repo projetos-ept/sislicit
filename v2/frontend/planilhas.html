@@ -45,10 +45,14 @@
         </div>
       </div>
       <div style="display:flex;gap:8px;margin-top:12px;">
-        <button class="btn btn-primary" onclick="criarPlanilha()">Criar</button>
+        <button class="btn btn-primary" id="btn-criar">Criar</button>
         <button class="btn btn-secondary" onclick="closeNova()">Cancelar</button>
       </div>
     </div>
+  </div>
+
+  <div class="form-group" style="max-width:320px;">
+    <input id="busca" class="form-control" placeholder="🔎 Buscar por título ou nº processo…">
   </div>
 
   <div id="lista" class="card">
@@ -67,6 +71,7 @@
       </table>
     </div>
     <div id="empty" class="card-body text-muted hidden" style="text-align:center;padding:40px;">Nenhuma planilha ainda.</div>
+    <div id="semResultado" class="card-body text-muted hidden" style="text-align:center;padding:40px;">Nenhuma planilha encontrada para essa busca.</div>
   </div>
 </div>
 
@@ -80,7 +85,7 @@
     <div class="form-group"><label class="form-label">Título *</label><input id="rn-titulo" class="form-control"></div>
     <div class="form-group"><label class="form-label">Nº processo</label><input id="rn-proc" class="form-control"></div>
     <div style="display:flex;gap:8px;">
-      <button class="btn btn-primary" onclick="salvarRename()">Salvar</button>
+      <button class="btn btn-primary" id="btn-rename">Salvar</button>
       <button class="btn btn-secondary" onclick="closeRename()">Cancelar</button>
     </div>
   </div>
@@ -95,15 +100,29 @@ const fmtDate = (s) => s ? new Date(s.replace(' ','T')+'Z').toLocaleDateString('
 
 let PLANILHAS = [];
 
+function renderSkeleton(rows = 4) {
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = Array.from({ length: rows }).map(() =>
+    `<tr class="skeleton-row"><td>x</td><td>x</td><td>x</td><td>x</td><td>x</td></tr>`
+  ).join('');
+}
+
 async function load() {
+  renderSkeleton();
+  document.getElementById('empty').classList.add('hidden');
+  document.getElementById('semResultado').classList.add('hidden');
   const res = await apiFetch('/api/planilhas');
   const { planilhas } = await res.json();
   PLANILHAS = planilhas;
+  if (!planilhas.length) { document.getElementById('tbody').innerHTML = ''; document.getElementById('empty').classList.remove('hidden'); return; }
+  renderLista(PLANILHAS);
+}
+
+function renderLista(planilhas) {
   const tbody = document.getElementById('tbody');
-  const empty = document.getElementById('empty');
+  const semResultado = document.getElementById('semResultado');
   tbody.innerHTML = '';
-  if (!planilhas.length) { empty.classList.remove('hidden'); return; }
-  empty.classList.add('hidden');
+  semResultado.classList.toggle('hidden', planilhas.length > 0 || !PLANILHAS.length);
   const isAdmin = getUser()?.role === 'admin';
   planilhas.forEach(p => {
     const tr = document.createElement('tr');
@@ -115,12 +134,20 @@ async function load() {
       <td style="text-align:right;white-space:nowrap;">
         <a href="detalhe.html?id=${p.id}" class="btn btn-secondary btn-sm">Abrir</a>
         <button class="btn btn-ghost btn-sm" title="Renomear" onclick="openRename(${p.id})">✎</button>
-        <button class="btn btn-ghost btn-sm" title="Duplicar" onclick="duplicarPlanilha(${p.id})">⧉</button>
+        <button class="btn btn-ghost btn-sm" title="Duplicar" onclick="duplicarPlanilha(${p.id}, this)">⧉</button>
         ${isAdmin ? `<button class="btn btn-ghost btn-sm" title="Excluir" style="color:var(--danger)" onclick="excluirPlanilha(${p.id})">🗑</button>` : ''}
       </td>`;
     tbody.appendChild(tr);
   });
 }
+
+document.getElementById('busca').addEventListener('input', (e) => {
+  const q = e.target.value.trim().toLowerCase();
+  if (!q) { renderLista(PLANILHAS); return; }
+  renderLista(PLANILHAS.filter(p =>
+    p.titulo.toLowerCase().includes(q) || (p.numero_proc ?? '').toLowerCase().includes(q)
+  ));
+});
 
 function openRename(id) {
   const p = PLANILHAS.find(x => x.id === id);
@@ -133,22 +160,26 @@ function openRename(id) {
 function closeRename() { document.getElementById('renameModal').classList.remove('open'); }
 
 async function salvarRename() {
-  const id = Number(document.getElementById('renameModal').dataset.id);
-  const titulo = document.getElementById('rn-titulo').value.trim();
-  if (!titulo) { toast('Título obrigatório', 'err'); return; }
-  const res = await apiFetch(`/api/planilhas/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ titulo, numero_proc: document.getElementById('rn-proc').value.trim() || null }),
+  await withBusy(document.getElementById('btn-rename'), 'Salvando…', async () => {
+    const id = Number(document.getElementById('renameModal').dataset.id);
+    const titulo = document.getElementById('rn-titulo').value.trim();
+    if (!titulo) { toast('Título obrigatório', 'err'); return; }
+    const res = await apiFetch(`/api/planilhas/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ titulo, numero_proc: document.getElementById('rn-proc').value.trim() || null }),
+    });
+    if (res.ok) { closeRename(); load(); toast('Renomeado', 'ok'); }
+    else toast((await res.json()).error ?? 'Erro', 'err');
   });
-  if (res.ok) { closeRename(); load(); toast('Renomeado', 'ok'); }
-  else toast((await res.json()).error ?? 'Erro', 'err');
 }
 
-async function duplicarPlanilha(id) {
-  const res = await apiFetch(`/api/planilhas/${id}/duplicar`, { method: 'POST' });
-  const d = await res.json();
-  if (res.ok) { toast('Planilha duplicada', 'ok'); load(); }
-  else toast(d.error ?? 'Erro', 'err');
+async function duplicarPlanilha(id, btn) {
+  await withBusy(btn, '…', async () => {
+    const res = await apiFetch(`/api/planilhas/${id}/duplicar`, { method: 'POST' });
+    const d = await res.json();
+    if (res.ok) { toast('Planilha duplicada', 'ok'); load(); }
+    else toast(d.error ?? 'Erro', 'err');
+  });
 }
 
 async function excluirPlanilha(id) {
@@ -163,16 +194,27 @@ function openNova()  { document.getElementById('novaPanel').style.display = ''; 
 function closeNova() { document.getElementById('novaPanel').style.display = 'none'; }
 
 async function criarPlanilha() {
-  const titulo = document.getElementById('nv-titulo').value.trim();
-  if (!titulo) { toast('Título obrigatório', 'err'); return; }
-  const res = await apiFetch('/api/planilhas', {
-    method: 'POST',
-    body: JSON.stringify({ titulo, numero_proc: document.getElementById('nv-proc').value.trim() || null, descricao: document.getElementById('nv-desc').value.trim() || null }),
+  await withBusy(document.getElementById('btn-criar'), 'Criando…', async () => {
+    const titulo = document.getElementById('nv-titulo').value.trim();
+    if (!titulo) { toast('Título obrigatório', 'err'); return; }
+    const res = await apiFetch('/api/planilhas', {
+      method: 'POST',
+      body: JSON.stringify({ titulo, numero_proc: document.getElementById('nv-proc').value.trim() || null, descricao: document.getElementById('nv-desc').value.trim() || null }),
+    });
+    const d = await res.json();
+    if (res.ok) { closeNova(); window.location.href = `detalhe.html?id=${d.planilha.id}`; }
+    else toast(d.error ?? 'Erro', 'err');
   });
-  const d = await res.json();
-  if (res.ok) { closeNova(); window.location.href = `detalhe.html?id=${d.planilha.id}`; }
-  else toast(d.error ?? 'Erro', 'err');
 }
+
+document.getElementById('btn-criar').addEventListener('click', criarPlanilha);
+document.getElementById('btn-rename').addEventListener('click', salvarRename);
+['nv-titulo', 'nv-proc', 'nv-desc'].forEach(id =>
+  document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') criarPlanilha(); })
+);
+['rn-titulo', 'rn-proc'].forEach(id =>
+  document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') salvarRename(); })
+);
 
 load();
 </script>

@@ -48,7 +48,7 @@
       <div class="form-group"><label class="form-label">Nº processo</label><input id="m-proc" class="form-control"></div>
       <div class="form-group"><label class="form-label">Descrição</label><input id="m-desc" class="form-control"></div>
       <div style="display:flex;gap:8px;">
-        <button class="btn btn-primary" onclick="saveMeta()">Salvar</button>
+        <button class="btn btn-primary" id="btn-savemeta" onclick="saveMeta()">Salvar</button>
         <button class="btn btn-secondary" onclick="closeEditMeta()">Cancelar</button>
       </div>
     </div>
@@ -67,6 +67,10 @@
     <button class="btn btn-secondary btn-sm" onclick="bulkExcel()">⬇ Excel</button>
     <button class="btn btn-secondary btn-sm" onclick="bulkJson()">⬇ JSON</button>
     <button class="btn btn-danger btn-sm" onclick="bulkDelete()">🗑 Excluir</button>
+  </div>
+
+  <div class="form-group" style="max-width:320px;">
+    <input id="buscaItens" class="form-control" placeholder="🔎 Buscar item ou descrição…">
   </div>
 
   <!-- Category filter chips -->
@@ -126,7 +130,7 @@
       <button class="btn btn-secondary btn-sm" onclick="criarCategoriaInline()">Criar</button>
     </div>
     <div style="display:flex;gap:8px;margin-top:12px;">
-      <button class="btn btn-primary btn-sm" onclick="addItem()">Adicionar</button>
+      <button class="btn btn-primary btn-sm" id="btn-additem" onclick="addItem()">Adicionar</button>
       <button class="btn btn-secondary btn-sm" onclick="toggleNewPanel()">Cancelar</button>
     </div>
   </div>
@@ -162,7 +166,14 @@ let selectedCat = null;
 const pendingChanges = new Map(); // itemId -> { campo: valor }
 
 // ── Load ──────────────────────────────────────────────────────────────────────
+function renderSkeletonItens(rows = 5) {
+  document.getElementById('tableBody').innerHTML = Array.from({ length: rows }).map(() =>
+    `<tr class="skeleton-row"><td>x</td><td>x</td><td>x</td><td>x</td><td>x</td><td>x</td><td>x</td><td>x</td><td>x</td><td>x</td></tr>`
+  ).join('');
+}
+
 async function load() {
+  renderSkeletonItens();
   const res = await apiFetch(`/api/planilhas/${PID}`);
   if (!res.ok) { toast('Erro ao carregar planilha', 'err'); return; }
   const d = await res.json();
@@ -185,7 +196,8 @@ function buildCatChips(itens) {
   const seen = new Map();
   itens.forEach(it => {
     if (it.cat_nome && !seen.has(it.categoria_id))
-      seen.set(it.categoria_id, { nome: it.cat_nome, cor: it.cat_cor, borda: it.cat_cor_borda, texto: it.cat_cor_texto });
+      seen.set(it.categoria_id, { nome: it.cat_nome, cor: it.cat_cor, borda: it.cat_cor_borda, texto: it.cat_cor_texto, subtotal: 0 });
+    if (it.cat_nome) seen.get(it.categoria_id).subtotal += Number(it.valor_total ?? 0);
   });
   const wrap = document.getElementById('catChips');
   wrap.innerHTML = '';
@@ -193,11 +205,33 @@ function buildCatChips(itens) {
     const chip = document.createElement('button');
     chip.className = 'cat-chip';
     chip.dataset.cat = id;
-    chip.textContent = cat.nome;
+    chip.title = `Subtotal: ${fmtBRL(cat.subtotal)}`;
+    chip.innerHTML = `${cat.nome} <span class="cat-chip-total">${fmtBRL(cat.subtotal)}</span>`;
     chip.style.cssText = `background:${cat.cor};border-color:${cat.borda};color:${cat.texto}`;
     chip.onclick = () => toggleCat(chip, id);
     wrap.appendChild(chip);
   });
+}
+
+function recomputeCatChips() {
+  const rows = document.querySelectorAll('#tableBody tr[data-id]');
+  const itens = Array.from(rows).map(tr => {
+    const badge = tr.querySelector('.cat-badge');
+    const vtTd = tr.querySelector('[data-vtotal]');
+    return {
+      categoria_id: tr.dataset.cat || null,
+      valor_total: parseFloat(vtTd?.dataset.raw ?? '0'),
+      cat_nome: badge?.textContent,
+      cat_cor: badge?.style.background,
+      cat_cor_borda: badge?.style.borderColor,
+      cat_cor_texto: badge?.style.color,
+    };
+  });
+  buildCatChips(itens);
+  if (selectedCat) {
+    const chip = document.querySelector(`.cat-chip[data-cat="${selectedCat}"]`);
+    if (chip) chip.classList.add('active');
+  }
 }
 
 function toggleCat(chip, catId) {
@@ -210,10 +244,21 @@ function toggleCat(chip, catId) {
     selectedCat = c;
     chip.classList.add('active');
   }
+  aplicarFiltroItens();
+}
+
+function aplicarFiltroItens() {
+  const q = (document.getElementById('buscaItens')?.value ?? '').trim().toLowerCase();
   document.querySelectorAll('#tableBody tr[data-id]').forEach(tr => {
-    tr.style.display = (!selectedCat || tr.dataset.cat === selectedCat) ? '' : 'none';
+    const passaCat = !selectedCat || tr.dataset.cat === selectedCat;
+    const texto = (tr.querySelector('[data-campo="item"]')?.textContent ?? '') + ' ' +
+                  (tr.querySelector('[data-campo="descricao"]')?.textContent ?? '');
+    const passaBusca = !q || texto.toLowerCase().includes(q);
+    tr.style.display = (passaCat && passaBusca) ? '' : 'none';
   });
 }
+
+document.getElementById('buscaItens').addEventListener('input', aplicarFiltroItens);
 
 // ── Build row ─────────────────────────────────────────────────────────────────
 function appendRow(it) {
@@ -338,6 +383,7 @@ async function flushRow(itemId) {
     const vtTd = tr.querySelector('[data-vtotal]');
     if (vtTd) { vtTd.querySelector('.cell-display').textContent = d.valor_total_fmt; vtTd.dataset.raw = d.valor_total; }
     document.getElementById('totalGeral').textContent = d.planilha_total_fmt;
+    recomputeCatChips();
   } else {
     toast(d.error ?? 'Erro ao salvar', 'err');
   }
@@ -379,16 +425,7 @@ async function setCategoria(itemId, catId) {
     } else {
       zone.innerHTML = `<span class="cat-none" onclick="openCatDropdown(event,${itemId})">— categoria</span>`;
     }
-    // Rebuild chips
-    const allRows = Array.from(document.querySelectorAll('#tableBody tr[data-id]'));
-    const itens = allRows.map(r => ({
-      categoria_id: r.dataset.cat || null,
-      cat_nome: r.querySelector('.cat-badge')?.textContent,
-      cat_cor: r.querySelector('.cat-badge')?.style.background,
-      cat_cor_borda: r.querySelector('.cat-badge')?.style.borderColor,
-      cat_cor_texto: r.querySelector('.cat-badge')?.style.color,
-    })).filter(i => i.cat_nome);
-    buildCatChips(itens);
+    recomputeCatChips();
   }
 }
 
@@ -407,6 +444,8 @@ async function clonarItem(itemId) {
     toast('Item clonado', 'ok');
     renumberDisplay();
     updateTotalHeader(d.total_fmt, d.total_itens);
+    recomputeCatChips();
+    aplicarFiltroItens();
   } else toast(d.error ?? 'Erro', 'err');
 }
 
@@ -418,6 +457,7 @@ async function excluirItem(itemId) {
     document.querySelector(`tr[data-id="${itemId}"]`)?.remove();
     renumberDisplay();
     updateTotalHeader(d.total_fmt, d.total_itens);
+    recomputeCatChips();
     toast('Item excluído', 'ok');
   } else toast(d.error ?? 'Erro', 'err');
 }
@@ -486,34 +526,41 @@ async function criarCategoriaInline() {
 }
 
 async function addItem() {
-  const item = document.getElementById('ni-item').value.trim();
-  if (!item) { toast('Nome obrigatório', 'err'); return; }
-  const res = await apiFetch(`/api/planilhas/${PID}/itens`, {
-    method: 'POST',
-    body: JSON.stringify({
-      item,
-      descricao:      document.getElementById('ni-desc').value.trim() || null,
-      unidade:        document.getElementById('ni-unid').value.trim() || null,
-      quantidade:     parseFloat(document.getElementById('ni-qtd').value) || 0,
-      valor_unitario: parseFloat(document.getElementById('ni-vu').value)  || 0,
-      categoria_id:   document.getElementById('ni-cat').value ? Number(document.getElementById('ni-cat').value) : null,
-    }),
+  await withBusy(document.getElementById('btn-additem'), 'Adicionando…', async () => {
+    const item = document.getElementById('ni-item').value.trim();
+    if (!item) { toast('Nome obrigatório', 'err'); return; }
+    const res = await apiFetch(`/api/planilhas/${PID}/itens`, {
+      method: 'POST',
+      body: JSON.stringify({
+        item,
+        descricao:      document.getElementById('ni-desc').value.trim() || null,
+        unidade:        document.getElementById('ni-unid').value.trim() || null,
+        quantidade:     parseFloat(document.getElementById('ni-qtd').value) || 0,
+        valor_unitario: parseFloat(document.getElementById('ni-vu').value)  || 0,
+        categoria_id:   document.getElementById('ni-cat').value ? Number(document.getElementById('ni-cat').value) : null,
+      }),
+    });
+    const d = await res.json();
+    if (d.ok) {
+      const cat = CATS.find(c => c.id === d.item.categoria_id);
+      if (cat) Object.assign(d.item, { cat_nome: cat.nome, cat_cor: cat.cor_hex, cat_cor_borda: cat.cor_borda_hex, cat_cor_texto: cat.cor_texto_hex });
+      appendRow(d.item);
+      updateTotalHeader(d.total_fmt, d.total_itens);
+      recomputeCatChips();
+      aplicarFiltroItens();
+      document.getElementById('tbEmpty').classList.add('hidden');
+      ['ni-item','ni-desc','ni-unid'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('ni-qtd').value = '1';
+      document.getElementById('ni-vu').value  = '0';
+      document.getElementById('ni-vt').value  = fmtBRL(0);
+      document.getElementById('ni-cat').value = '';
+      document.getElementById('ni-item').focus();
+      toast('Item adicionado', 'ok');
+    } else toast(d.error ?? 'Erro', 'err');
   });
-  const d = await res.json();
-  if (d.ok) {
-    const cat = CATS.find(c => c.id === d.item.categoria_id);
-    if (cat) Object.assign(d.item, { cat_nome: cat.nome, cat_cor: cat.cor_hex, cat_cor_borda: cat.cor_borda_hex, cat_cor_texto: cat.cor_texto_hex });
-    appendRow(d.item);
-    updateTotalHeader(d.total_fmt, d.total_itens);
-    document.getElementById('tbEmpty').classList.add('hidden');
-    ['ni-item','ni-desc','ni-unid'].forEach(id => document.getElementById(id).value = '');
-    document.getElementById('ni-qtd').value = '1';
-    document.getElementById('ni-vu').value  = '0';
-    document.getElementById('ni-vt').value  = fmtBRL(0);
-    document.getElementById('ni-cat').value = '';
-    toast('Item adicionado', 'ok');
-  } else toast(d.error ?? 'Erro', 'err');
 }
+
+document.getElementById('ni-item').addEventListener('keydown', e => { if (e.key === 'Enter') addItem(); });
 
 // ── JSON import modal ─────────────────────────────────────────────────────────
 function openJsonModal()  { document.getElementById('jsonModal').classList.add('open'); }
@@ -539,15 +586,17 @@ function openEditMeta() {
 function closeEditMeta() { document.getElementById('metaModal').classList.remove('open'); }
 
 async function saveMeta() {
-  const res = await apiFetch(`/api/planilhas/${PID}`, {
-    method: 'PATCH',
-    body: JSON.stringify({
-      titulo:      document.getElementById('m-titulo').value.trim() || null,
-      numero_proc: document.getElementById('m-proc').value.trim()   || null,
-      descricao:   document.getElementById('m-desc').value.trim()   || null,
-    }),
+  await withBusy(document.getElementById('btn-savemeta'), 'Salvando…', async () => {
+    const res = await apiFetch(`/api/planilhas/${PID}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        titulo:      document.getElementById('m-titulo').value.trim() || null,
+        numero_proc: document.getElementById('m-proc').value.trim()   || null,
+        descricao:   document.getElementById('m-desc').value.trim()   || null,
+      }),
+    });
+    if ((await res.json()).ok) { closeEditMeta(); load(); toast('Salvo', 'ok'); }
   });
-  if ((await res.json()).ok) { closeEditMeta(); load(); toast('Salvo', 'ok'); }
 }
 
 // ── Agrupar ───────────────────────────────────────────────────────────────────
