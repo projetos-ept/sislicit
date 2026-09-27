@@ -49,6 +49,7 @@ Nenhuma dependência externa de criptografia/JWT — tudo via `crypto.subtle` na
 - **Importação via JSON**, incluindo um prompt pronto (aba "Importar via IA" no Admin) para gerar esse JSON a partir do texto de um pedido/edital usando qualquer IA de texto.
 - Painel **Admin**: dashboard com contadores, gestão de usuários (criar, editar, trocar senha, desativar) e categorias.
 - Tema **claro/escuro**, com preferência salva no navegador.
+- Conveniências de UX: busca client-side em planilhas e itens, subtotal por categoria nos chips de filtro, indicador de carregamento (skeleton) nas listagens, botões desabilitados durante requisições (evita duplo-clique), atalhos de teclado (Enter para salvar, Esc para fechar modais) e opção de mostrar/ocultar senha nos campos de login e cadastro.
 
 ## Estrutura do repositório
 

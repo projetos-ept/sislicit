@@ -87,6 +87,53 @@ function toast(msg, type = 'ok') {
   _toastTimer = setTimeout(() => { el.className = ''; }, 2800);
 }
 
+// ── Busy state (evita duplo-clique/duplo-submit em ações assíncronas) ──────────
+async function withBusy(btn, label, fn) {
+  if (!btn || btn.disabled) return;
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = label;
+  try {
+    await fn();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+}
+
+// ── Modais: Escape fecha o topo mais recente aberto ────────────────────────────
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const open = document.querySelectorAll('.modal-backdrop.open');
+  if (open.length) open[open.length - 1].classList.remove('open');
+});
+
+// ── Mostrar/ocultar senha ───────────────────────────────────────────────────────
+function initPasswordToggles() {
+  document.querySelectorAll('input[type="password"]').forEach(input => {
+    if (input.dataset.toggleBound) return;
+    input.dataset.toggleBound = '1';
+    const wrap = document.createElement('div');
+    wrap.style.position = 'relative';
+    input.parentNode.insertBefore(wrap, input);
+    wrap.appendChild(input);
+    input.style.paddingRight = '38px';
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'pw-toggle';
+    btn.tabIndex = -1;
+    btn.title = 'Mostrar/ocultar senha';
+    btn.textContent = '👁';
+    btn.onclick = () => {
+      const show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      btn.textContent = show ? '🙈' : '👁';
+    };
+    wrap.appendChild(btn);
+  });
+}
+
 // ── Navbar user info ──────────────────────────────────────────────────────────
 function initNavbar() {
   const user = getUser();
@@ -97,4 +144,4 @@ function initNavbar() {
   });
 }
 
-document.addEventListener('DOMContentLoaded', () => { initNavbar(); initThemeToggle(); });
+document.addEventListener('DOMContentLoaded', () => { initNavbar(); initThemeToggle(); initPasswordToggles(); });

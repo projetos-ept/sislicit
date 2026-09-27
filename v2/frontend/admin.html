@@ -97,7 +97,7 @@
       </label>
     </div>
     <div style="display:flex;gap:8px;">
-      <button class="btn btn-primary" onclick="saveUser()">Salvar</button>
+      <button class="btn btn-primary" id="btn-saveuser" onclick="saveUser()">Salvar</button>
       <button class="btn btn-secondary" onclick="closeUserForm()">Cancelar</button>
     </div>
   </div>
@@ -119,7 +119,7 @@
       </div>
     </div>
     <div style="display:flex;gap:8px;">
-      <button class="btn btn-primary" onclick="saveCat()">Salvar</button>
+      <button class="btn btn-primary" id="btn-savecat" onclick="saveCat()">Salvar</button>
       <button class="btn btn-secondary" onclick="closeCatForm()">Cancelar</button>
     </div>
   </div>
@@ -142,6 +142,8 @@ async function loadDashboard() {
 }
 
 async function loadUsers() {
+  const tbSkel = document.getElementById('usersTbody');
+  tbSkel.innerHTML = `<tr class="skeleton-row"><td>x</td><td>x</td><td>x</td><td>x</td><td>x</td></tr>`.repeat(3);
   const res = await apiFetch('/api/admin/users');
   const { users } = await res.json();
   const tb = document.getElementById('usersTbody');
@@ -160,6 +162,8 @@ async function loadUsers() {
 }
 
 async function loadCats() {
+  const tbSkel = document.getElementById('catsTbody');
+  tbSkel.innerHTML = `<tr class="skeleton-row"><td>x</td><td>x</td><td>x</td></tr>`.repeat(3);
   const res = await apiFetch('/api/categorias');
   const { categorias } = await res.json();
   const tb = document.getElementById('catsTbody');
@@ -212,22 +216,24 @@ function editUser(u) {
 function closeUserForm() { document.getElementById('userModal').classList.remove('open'); }
 
 async function saveUser() {
-  const id = document.getElementById('u-id').value;
-  const body = {
-    username: document.getElementById('u-username').value.trim(),
-    email:    document.getElementById('u-email').value.trim(),
-    role:     document.getElementById('u-role').value,
-  };
-  const pw = document.getElementById('u-password').value;
-  if (pw) body.password = pw;
-  if (id) body.ativo = document.getElementById('u-ativo').checked;
+  await withBusy(document.getElementById('btn-saveuser'), 'Salvando…', async () => {
+    const id = document.getElementById('u-id').value;
+    const body = {
+      username: document.getElementById('u-username').value.trim(),
+      email:    document.getElementById('u-email').value.trim(),
+      role:     document.getElementById('u-role').value,
+    };
+    const pw = document.getElementById('u-password').value;
+    if (pw) body.password = pw;
+    if (id) body.ativo = document.getElementById('u-ativo').checked;
 
-  const res = await apiFetch(id ? `/api/admin/users/${id}` : '/api/admin/users', {
-    method: id ? 'PATCH' : 'POST', body: JSON.stringify(body),
+    const res = await apiFetch(id ? `/api/admin/users/${id}` : '/api/admin/users', {
+      method: id ? 'PATCH' : 'POST', body: JSON.stringify(body),
+    });
+    const d = await res.json();
+    if (res.ok) { closeUserForm(); loadUsers(); loadDashboard(); toast('Salvo', 'ok'); }
+    else toast(d.error ?? 'Erro', 'err');
   });
-  const d = await res.json();
-  if (res.ok) { closeUserForm(); loadUsers(); loadDashboard(); toast('Salvo', 'ok'); }
-  else toast(d.error ?? 'Erro', 'err');
 }
 
 async function deactivateUser(id, name) {
@@ -285,18 +291,20 @@ document.getElementById('c-nome')?.addEventListener('input', () => {
 });
 
 async function saveCat() {
-  const id = document.getElementById('c-id').value;
-  const body = {
-    nome:    document.getElementById('c-nome').value.trim(),
-    cor_hex: document.getElementById('c-cor').value,
-  };
-  if (!body.nome) { toast('Nome obrigatório', 'err'); return; }
-  const res = await apiFetch(id ? `/api/categorias/${id}` : '/api/categorias', {
-    method: id ? 'PATCH' : 'POST', body: JSON.stringify(body),
+  await withBusy(document.getElementById('btn-savecat'), 'Salvando…', async () => {
+    const id = document.getElementById('c-id').value;
+    const body = {
+      nome:    document.getElementById('c-nome').value.trim(),
+      cor_hex: document.getElementById('c-cor').value,
+    };
+    if (!body.nome) { toast('Nome obrigatório', 'err'); return; }
+    const res = await apiFetch(id ? `/api/categorias/${id}` : '/api/categorias', {
+      method: id ? 'PATCH' : 'POST', body: JSON.stringify(body),
+    });
+    const d = await res.json();
+    if (res.ok) { closeCatForm(); loadCats(); loadDashboard(); toast('Salvo', 'ok'); }
+    else toast(d.error ?? 'Erro', 'err');
   });
-  const d = await res.json();
-  if (res.ok) { closeCatForm(); loadCats(); loadDashboard(); toast('Salvo', 'ok'); }
-  else toast(d.error ?? 'Erro', 'err');
 }
 
 async function deleteCat(id, name) {
