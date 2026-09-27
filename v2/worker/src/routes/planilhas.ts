@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import * as XLSX from 'xlsx';
 import type { Env } from '../index';
 import type { JWTPayload } from '../auth';
 import { fmtBRL, renumerar, touchPlanilha } from '../utils';
@@ -315,9 +316,6 @@ app.get('/:id/export/excel', async (c) => {
 
   const total = itens.results.reduce((s, i) => s + i.valor_total, 0);
 
-  // Dynamic import so bundler doesn't fail if xlsx not installed
-  const XLSX = await import('xlsx');
-
   const rows: unknown[][] = [
     ['N°', 'Item', 'Descrição', 'Unidade', 'Qtd.', 'Vl. Unit.', 'Vl. Total', 'Categoria'],
     ...itens.results.map(i => [i.n, i.item, i.descricao ?? '', i.unidade ?? '', i.quantidade, i.valor_unitario, i.valor_total, i.cat_nome ?? '']),
@@ -357,7 +355,6 @@ app.post('/:id/bulk/xlsx', async (c) => {
   ).bind(...ids).all<ItemRow & { cat_nome: string | null }>();
 
   const total = itens.results.reduce((s, i) => s + i.valor_total, 0);
-  const XLSX = await import('xlsx');
   const rows: unknown[][] = [
     ['N°', 'Item', 'Descrição', 'Unidade', 'Qtd.', 'Vl. Unit.', 'Vl. Total', 'Categoria'],
     ...itens.results.map(i => [i.n, i.item, i.descricao ?? '', i.unidade ?? '', i.quantidade, i.valor_unitario, i.valor_total, i.cat_nome ?? '']),
