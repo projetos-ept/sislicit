@@ -21,7 +21,11 @@
 </nav>
 
 <div class="container">
-  <div class="page-header"><h1>Painel Administrativo</h1></div>
+  <div class="page-header">
+    <h1>Painel Administrativo</h1>
+    <button class="btn btn-secondary btn-sm" id="btn-sync" title="Reenvia ações que ficaram pendentes por falta de conexão e recarrega os dados">🔄 Forçar sincronização</button>
+    <span id="syncInfo" class="text-muted" style="font-size:0.78rem;"></span>
+  </div>
 
   <!-- Dashboard counters -->
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:28px;" id="counters">
@@ -348,9 +352,33 @@ function copiarPromptIA() {
   );
 }
 
+// ── Sincronização manual ─────────────────────────────────────────────────────────
+function atualizarSyncInfo() {
+  const n = offlineQueueCount();
+  document.getElementById('syncInfo').textContent = n > 0
+    ? `${n} ação${n > 1 ? 'ões' : ''} pendente${n > 1 ? 's' : ''} de sincronização`
+    : '';
+}
+
+async function sincronizarAgora() {
+  await withBusy(document.getElementById('btn-sync'), 'Sincronizando…', async () => {
+    const pendentesAntes = offlineQueueCount();
+    const { ok, falha, restantes } = await forcarSincronizacao();
+    await Promise.all([loadDashboard(), loadUsers(), loadCats()]);
+    atualizarSyncInfo();
+
+    if (pendentesAntes === 0) toast('Dados atualizados', 'ok');
+    else if (falha === 0) toast(`${ok} ação${ok > 1 ? 'ões' : ''} sincronizada${ok > 1 ? 's' : ''} com sucesso`, 'ok');
+    else toast(`${ok} sincronizada(s), ${falha} falharam e continuam na fila (${restantes} restante(s))`, 'err');
+  });
+}
+document.getElementById('btn-sync').addEventListener('click', sincronizarAgora);
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 document.getElementById('ia-prompt').value = PROMPT_IA;
 loadDashboard(); loadUsers(); loadCats();
+atualizarSyncInfo();
+setInterval(atualizarSyncInfo, 2000);
 </script>
 </body>
 </html>

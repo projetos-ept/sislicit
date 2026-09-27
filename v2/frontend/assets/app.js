@@ -56,9 +56,80 @@ function logout() {
   window.location.href = '/index.html';
 }
 
+// ── Offline storage (cache de leitura + fila de ações pendentes) ────────────────
+// Guarda a última resposta boa-sucedida de cada GET, e enfileira escritas
+// (POST/PATCH/DELETE) feitas sem conexão para reenviar depois via sincronização.
+const OFFLINE_CACHE_PREFIX = 'sl_cache:';
+const OFFLINE_QUEUE_KEY = 'sl_offline_queue';
+
+function offlineSaveCache(path, data) {
+  try { localStorage.setItem(OFFLINE_CACHE_PREFIX + path, JSON.stringify({ data, ts: Date.now() })); } catch {}
+}
+function offlineLoadCache(path) {
+  try {
+    const raw = localStorage.getItem(OFFLINE_CACHE_PREFIX + path);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch { return null; }
+}
+function offlineGetQueue() {
+  try { return JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) ?? '[]'); } catch { return []; }
+}
+function offlineSetQueue(q) {
+  try { localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(q)); } catch {}
+}
+function offlineEnqueue(path, opts) {
+  const q = offlineGetQueue();
+  q.push({ id: Date.now() + '-' + Math.random().toString(36).slice(2), path, method: (opts.method ?? 'POST').toUpperCase(), body: opts.body ?? null, ts: Date.now() });
+  offlineSetQueue(q);
+  updateSyncBadge();
+}
+function offlineQueueCount() { return offlineGetQueue().length; }
+
+// Reenvia, em ordem, as ações que ficaram pendentes enquanto o app estava sem
+// conexão. Cada ação só sai da fila se a resposta do servidor for de sucesso.
+async function forcarSincronizacao() {
+  const fila = offlineGetQueue();
+  let ok = 0, falha = 0;
+  const restantes = [];
+  for (const acao of fila) {
+    try {
+      const token = getToken();
+      const res = await fetch(API_BASE + acao.path, {
+        method: acao.method,
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: acao.body,
+      });
+      if (res.ok) ok++; else { falha++; restantes.push(acao); }
+    } catch { falha++; restantes.push(acao); }
+  }
+  offlineSetQueue(restantes);
+  updateSyncBadge();
+  return { ok, falha, restantes: restantes.length };
+}
+
+function updateSyncBadge() {
+  const n = offlineQueueCount();
+  document.querySelectorAll('.sync-badge').forEach(el => {
+    el.textContent = n > 0 ? `⏳ ${n} pendente${n > 1 ? 's' : ''}` : '';
+    el.classList.toggle('hidden', n === 0);
+  });
+}
+
+function updateConnectionStatus() {
+  const online = navigator.onLine;
+  document.querySelectorAll('.conn-status').forEach(el => {
+    el.textContent = online ? '🟢 Online' : '🔴 Offline';
+    el.title = online ? 'Conectado ao servidor' : 'Sem conexão — usando dados salvos localmente';
+  });
+}
+window.addEventListener('online', updateConnectionStatus);
+window.addEventListener('offline', updateConnectionStatus);
+
 // ── API fetch ─────────────────────────────────────────────────────────────────
 async function apiFetch(path, opts = {}) {
   const token = getToken();
+  const method = (opts.method ?? 'GET').toUpperCase();
   let res;
   try {
     res = await fetch(API_BASE + path, {
@@ -73,7 +144,23 @@ async function apiFetch(path, opts = {}) {
     // fetch() rejeita em falha de rede/CORS — sem isso, o erro fica silencioso
     // (promise rejeitada sem handler) e a UI parece simplesmente não fazer nada.
     console.error('apiFetch falhou:', path, err);
-    toast('Falha de conexão com o servidor. Verifique sua internet e tente novamente.', 'err');
+
+    if (method === 'GET') {
+      const cached = offlineLoadCache(path);
+      if (cached) {
+        toast('Sem conexão — mostrando dados salvos localmente', 'err');
+        return {
+          ok: true, status: 0, fromCache: true,
+          json: async () => cached.data,
+          blob: async () => new Blob([]),
+          text: async () => JSON.stringify(cached.data),
+        };
+      }
+      toast('Sem conexão e nenhum dado salvo localmente para esta tela.', 'err');
+    } else {
+      offlineEnqueue(path, opts);
+      toast('Sem conexão — ação salva e será enviada ao sincronizar.', 'err');
+    }
     return {
       ok: false,
       status: 0,
@@ -83,6 +170,9 @@ async function apiFetch(path, opts = {}) {
     };
   }
   if (res.status === 401) { clearAuth(); window.location.href = '/index.html'; }
+  if (method === 'GET' && res.ok) {
+    res.clone().json().then(data => offlineSaveCache(path, data)).catch(() => {});
+  }
   return res;
 }
 
@@ -165,4 +255,20 @@ function initNavbar() {
   });
 }
 
-document.addEventListener('DOMContentLoaded', () => { initNavbar(); initThemeToggle(); initPasswordToggles(); });
+function initConnStatusBadge() {
+  const navUser = document.querySelector('.navbar-user');
+  if (!navUser) return;
+  const conn = document.createElement('span');
+  conn.className = 'conn-status';
+  conn.style.fontSize = '0.75rem';
+  navUser.prepend(conn);
+  const sync = document.createElement('span');
+  sync.className = 'sync-badge hidden';
+  sync.style.fontSize = '0.75rem';
+  sync.style.color = 'var(--warning)';
+  navUser.prepend(sync);
+  updateConnectionStatus();
+  updateSyncBadge();
+}
+
+document.addEventListener('DOMContentLoaded', () => { initNavbar(); initThemeToggle(); initPasswordToggles(); initConnStatusBadge(); });
