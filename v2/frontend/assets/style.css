@@ -18,6 +18,37 @@
   --mono: 'DM Mono', monospace;
 }
 
+:root[data-theme="light"] {
+  --bg: #f4f5fa;
+  --surface: #ffffff;
+  --surface2: #eef0f7;
+  --border: #dde1ec;
+  --accent: #6366f1;
+  --accent-hover: #4f46e5;
+  --text: #1b1e2b;
+  --text-muted: #6b7086;
+  --danger: #dc2626;
+  --success: #16a34a;
+  --warning: #b45309;
+}
+
+/* ── Theme toggle ────────────────────────────────────────────────────────── */
+.theme-toggle {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 6px;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+.theme-toggle:hover { color: var(--text); background: var(--surface2); }
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
