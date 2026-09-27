@@ -51,6 +51,7 @@ Nenhuma dependência externa de criptografia/JWT — tudo via `crypto.subtle` na
 - Painel **Admin**: dashboard com contadores, gestão de usuários (criar, editar, trocar senha, desativar) e categorias.
 - Tema **claro/escuro**, com preferência salva no navegador.
 - Conveniências de UX: busca client-side em planilhas e itens, subtotal por categoria nos chips de filtro, indicador de carregamento (skeleton) nas listagens, botões desabilitados durante requisições (evita duplo-clique), atalhos de teclado (Enter para salvar, Esc para fechar modais) e opção de mostrar/ocultar senha nos campos de login e cadastro.
+- **Offline storage**: toda leitura (`GET`) bem-sucedida fica salva em `localStorage`; se a conexão cair, o app mostra os últimos dados salvos em vez de quebrar. Escritas feitas sem conexão entram numa fila local (nunca fingem sucesso) e podem ser reenviadas manualmente pelo botão **"🔄 Forçar sincronização"** no Admin. Indicador de conexão (🟢/🔴) e contador de pendências aparecem na navbar de todas as páginas.
 
 ## Estrutura do repositório
 
