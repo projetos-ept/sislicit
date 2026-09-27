@@ -32,6 +32,7 @@
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
       <button class="btn btn-secondary btn-sm" onclick="agrupar()">⊞ Agrupar cat.</button>
+      <a id="btnImprimir" href="#" class="btn btn-secondary btn-sm" target="_blank" rel="noopener">🖨 Imprimir</a>
       <a id="btnExcelFull" href="#" class="btn btn-secondary btn-sm" onclick="exportExcel(event)">⬇ Excel</a>
       <a id="btnJsonFull"  href="#" class="btn btn-secondary btn-sm" onclick="exportJson(event)">⬇ JSON</a>
     </div>
@@ -159,6 +160,7 @@ requireAuth();
 
 const PID = new URLSearchParams(location.search).get('id');
 if (!PID) location.href = 'planilhas.html';
+document.getElementById('btnImprimir').href = `imprimir.html?id=${PID}`;
 
 let CATS = [];
 let _sortState = { col: null, dir: null };

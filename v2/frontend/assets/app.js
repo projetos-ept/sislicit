@@ -59,14 +59,29 @@ function logout() {
 // ── API fetch ─────────────────────────────────────────────────────────────────
 async function apiFetch(path, opts = {}) {
   const token = getToken();
-  const res = await fetch(API_BASE + path, {
-    ...opts,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(opts.headers ?? {}),
-    },
-  });
+  let res;
+  try {
+    res = await fetch(API_BASE + path, {
+      ...opts,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(opts.headers ?? {}),
+      },
+    });
+  } catch (err) {
+    // fetch() rejeita em falha de rede/CORS — sem isso, o erro fica silencioso
+    // (promise rejeitada sem handler) e a UI parece simplesmente não fazer nada.
+    console.error('apiFetch falhou:', path, err);
+    toast('Falha de conexão com o servidor. Verifique sua internet e tente novamente.', 'err');
+    return {
+      ok: false,
+      status: 0,
+      json: async () => ({ error: 'Falha de conexão com o servidor' }),
+      blob: async () => new Blob([]),
+      text: async () => '',
+    };
+  }
   if (res.status === 401) { clearAuth(); window.location.href = '/index.html'; }
   return res;
 }
@@ -100,6 +115,12 @@ async function withBusy(btn, label, fn) {
     btn.textContent = original;
   }
 }
+
+// ── Rede de segurança: nenhuma falha deve ficar silenciosa ──────────────────────
+window.addEventListener('unhandledrejection', (e) => {
+  console.error('Erro não tratado:', e.reason);
+  toast('Ocorreu um erro inesperado. Tente novamente.', 'err');
+});
 
 // ── Modais: Escape fecha o topo mais recente aberto ────────────────────────────
 document.addEventListener('keydown', (e) => {
