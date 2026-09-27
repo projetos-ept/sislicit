@@ -14,9 +14,9 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS categorias (
   id             INTEGER PRIMARY KEY AUTOINCREMENT,
   nome           TEXT    NOT NULL,
-  cor_hex        TEXT    NOT NULL DEFAULT '#6366f1',
-  cor_borda_hex  TEXT    NOT NULL DEFAULT '#4338ca',
-  cor_texto_hex  TEXT    NOT NULL DEFAULT '#1e1b4b',
+  cor_hex        TEXT    NOT NULL DEFAULT '#BFDBFE',
+  cor_borda_hex  TEXT    NOT NULL DEFAULT '#77A2D8',
+  cor_texto_hex  TEXT    NOT NULL DEFAULT '#31598B',
   rotulo_oculto  TEXT    NOT NULL DEFAULT ''
 );
 
