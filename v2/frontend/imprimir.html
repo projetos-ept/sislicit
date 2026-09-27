@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SisLicit — Imprimir</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <script>window.API_BASE = 'https://sislicit-api.lucas-batista-biomedico.workers.dev';</script>
+  <style>
+    /* ── Página / orientação (@page é reescrito via JS ao trocar orientação
+       ou a opção de numeração — ver função aplicarOrientacao) ──────────── */
+    @page { size: A4 portrait; margin: 14mm 12mm; }
+
+    body.print-mode { background: #fff; }
+
+    .toolbar {
+      position: sticky; top: 0; z-index: 50;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 12px 20px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+    }
+    .toolbar-group { display: flex; align-items: center; gap: 8px; }
+    .toolbar-group label { font-size: 0.8rem; color: var(--text-muted); display: flex; align-items: center; gap: 5px; white-space: nowrap; cursor: pointer; }
+    .toolbar select { width: auto; }
+    .toolbar .spacer { flex: 1; }
+
+    /* ── Folha (conteúdo que vai para o papel) ───────────────────────────── */
+    .folha-wrap { display: flex; justify-content: center; padding: 24px; background: #6b6f80; min-height: calc(100vh - 60px); }
+    :root[data-theme="light"] .folha-wrap { background: #d9dbe4; }
+    .folha {
+      background: #fff; color: #14161f;
+      width: 210mm; min-height: 297mm; padding: 16mm 14mm;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.35);
+      font-family: var(--font);
+    }
+    .folha.paisagem { width: 297mm; min-height: 210mm; }
+
+    .cab-topo { display: flex; align-items: center; gap: 16px; border-bottom: 2px solid #14161f; padding-bottom: 12px; margin-bottom: 16px; }
+    .cab-logo {
+      width: 64px; height: 64px; border: 1px dashed #9aa; border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.65rem; color: #8a8f9e; text-align: center; flex-shrink: 0; overflow: hidden; cursor: pointer;
+    }
+    .cab-logo img { width: 100%; height: 100%; object-fit: contain; }
+    .cab-texto { flex: 1; }
+    .cab-texto [contenteditable] { outline: none; }
+    .cab-texto [contenteditable]:hover, .cab-texto [contenteditable]:focus,
+    #tituloEdit:hover, #tituloEdit:focus, #subEdit:hover, #subEdit:focus {
+      background: #fffbdd;
+    }
+    .cab-instituicao { font-size: 1.05rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; }
+    .cab-endereco { font-size: 0.75rem; color: #444; margin-top: 2px; }
+
+    .doc-titulo { font-size: 1.3rem; font-weight: 700; margin-bottom: 2px; }
+    .doc-sub { font-size: 0.85rem; color: #333; margin-bottom: 16px; }
+
+    table.imp-tabela { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+    table.imp-tabela th, table.imp-tabela td { border: 1px solid #999; padding: 5px 6px; text-align: left; vertical-align: top; }
+    table.imp-tabela th { background: #e8e9f0; font-weight: 700; font-size: 0.72rem; text-transform: uppercase; }
+    table.imp-tabela td.num, table.imp-tabela th.num { text-align: right; white-space: nowrap; }
+    table.imp-tabela tbody tr:nth-child(even) { background: #f7f7fa; }
+    table.imp-tabela tfoot td { font-weight: 700; border-top: 2px solid #14161f; }
+
+    .obs-livre {
+      margin-top: 16px; min-height: 40px; border: 1px solid #ccc; border-radius: 4px;
+      padding: 8px; font-size: 0.8rem; outline: none;
+    }
+    .obs-livre:empty::before { content: attr(data-placeholder); color: #999; }
+
+    .rodape { margin-top: 28px; font-size: 0.78rem; color: #222; }
+    .rodape-meta { display: flex; justify-content: space-between; margin-bottom: 24px; }
+    .rodape-assinaturas { display: flex; gap: 40px; margin-top: 36px; }
+    .assinatura-linha { flex: 1; text-align: center; }
+    .assinatura-linha .linha { border-top: 1px solid #333; margin-bottom: 4px; }
+
+    /* ── Impressão ────────────────────────────────────────────────────────── */
+    @media print {
+      .no-print { display: none !important; }
+      .folha-wrap { background: none; padding: 0; display: block; min-height: 0; }
+      .folha { box-shadow: none; width: auto; min-height: 0; padding: 0; margin: 0; }
+      table.imp-tabela thead { display: table-header-group; }
+      table.imp-tabela tr { break-inside: avoid; }
+      .cab-logo { border: none; }
+      .cab-logo:empty::after { content: ''; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="toolbar no-print">
+  <a href="#" id="btnVoltar" class="btn btn-ghost btn-sm">← Voltar</a>
+
+  <div class="toolbar-group">
+    <label>Orientação:
+      <select id="orientacao" class="form-control btn-sm">
+        <option value="portrait">Retrato</option>
+        <option value="landscape">Paisagem</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="toolbar-group">
+    <label><input type="checkbox" id="chkDescricao" checked> Descrição</label>
+    <label><input type="checkbox" id="chkCategoria" checked> Categoria</label>
+  </div>
+
+  <div class="toolbar-group">
+    <label><input type="checkbox" id="chkData" checked> Data</label>
+    <label><input type="checkbox" id="chkHora"> Hora</label>
+    <label><input type="checkbox" id="chkAssinaturas"> Assinaturas</label>
+    <label><input type="checkbox" id="chkObs"> Observações</label>
+    <label><input type="checkbox" id="chkNumPagina" checked> Numeração</label>
+  </div>
+
+  <div class="spacer"></div>
+  <button class="btn btn-primary btn-sm" id="btnImprimirAgora">🖨 Imprimir / Salvar PDF</button>
+</div>
+
+<div class="folha-wrap">
+  <div class="folha" id="folha">
+    <div class="cab-topo">
+      <div class="cab-logo" id="cabLogo" title="Clique para adicionar um logotipo">+ Logo</div>
+      <input type="file" id="logoInput" accept="image/*" style="display:none;">
+      <div class="cab-texto">
+        <div class="cab-instituicao" contenteditable="true" id="instEdit">Nome da instituição / empresa</div>
+        <div class="cab-endereco" contenteditable="true" id="enderecoEdit">Endereço · CNPJ · telefone (clique para editar)</div>
+      </div>
+    </div>
+
+    <div class="doc-titulo" contenteditable="true" id="tituloEdit">—</div>
+    <div class="doc-sub" contenteditable="true" id="subEdit"></div>
+
+    <table class="imp-tabela">
+      <thead>
+        <tr id="linhaCabecalho">
+          <th style="width:32px;">N°</th>
+          <th>Item</th>
+          <th id="thDescricao">Descrição</th>
+          <th style="width:50px;">Unid.</th>
+          <th class="num" style="width:55px;">Qtd.</th>
+          <th class="num" style="width:80px;">Vl. Unit.</th>
+          <th class="num" style="width:90px;">Vl. Total</th>
+          <th id="thCategoria" style="width:100px;">Categoria</th>
+        </tr>
+      </thead>
+      <tbody id="corpoTabela"></tbody>
+      <tfoot>
+        <tr>
+          <td id="tdTotalLabel" colspan="6">TOTAL GERAL</td>
+          <td class="num" id="tdTotalValor"></td>
+          <td id="tdTotalCatSpacer"></td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <div class="obs-livre" id="obsLivre" contenteditable="true" data-placeholder="Observações (clique para escrever)…" style="display:none;"></div>
+
+    <div class="rodape" id="rodape">
+      <div class="rodape-meta" id="rodapeMeta"></div>
+      <div class="rodape-assinaturas" id="rodapeAssinaturas" style="display:none;">
+        <div class="assinatura-linha"><div class="linha"></div>Responsável pela elaboração</div>
+        <div class="assinatura-linha"><div class="linha"></div>Aprovação</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="assets/app.js"></script>
+<script>
+requireAuth();
+
+const PID = new URLSearchParams(location.search).get('id');
+if (!PID) location.href = 'planilhas.html';
+document.getElementById('btnVoltar').href = `detalhe.html?id=${PID}`;
+
+async function load() {
+  const res = await apiFetch(`/api/planilhas/${PID}`);
+  if (!res.ok) { toast('Erro ao carregar planilha', 'err'); return; }
+  const d = await res.json();
+
+  document.title = `Imprimir — ${d.planilha.titulo}`;
+  document.getElementById('tituloEdit').textContent = d.planilha.titulo;
+  document.getElementById('subEdit').textContent = [d.planilha.numero_proc, d.planilha.descricao].filter(Boolean).join(' · ');
+  document.getElementById('tdTotalValor').textContent = d.total_fmt;
+
+  const tbody = document.getElementById('corpoTabela');
+  tbody.innerHTML = d.itens.map(it => `
+    <tr>
+      <td>${it.n}</td>
+      <td>${it.item}</td>
+      <td class="col-descricao">${it.descricao ?? ''}</td>
+      <td>${it.unidade ?? ''}</td>
+      <td class="num">${it.quantidade}</td>
+      <td class="num">${fmtBRL(it.valor_unitario)}</td>
+      <td class="num">${fmtBRL(it.valor_total)}</td>
+      <td class="col-categoria">${it.cat_nome ?? ''}</td>
+    </tr>
+  `).join('');
+
+  atualizarRodape();
+}
+
+// ── Logo ─────────────────────────────────────────────────────────────────────
+document.getElementById('cabLogo').addEventListener('click', () => document.getElementById('logoInput').click());
+document.getElementById('logoInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => { document.getElementById('cabLogo').innerHTML = `<img src="${reader.result}">`; };
+  reader.readAsDataURL(file);
+});
+
+// ── Orientação + numeração de página (ambos reescrevem a regra @page) ──────────
+function aplicarOrientacao() {
+  const v = document.getElementById('orientacao').value;
+  const numerar = document.getElementById('chkNumPagina').checked;
+  document.getElementById('folha').classList.toggle('paisagem', v === 'landscape');
+  let styleTag = document.getElementById('pageStyle');
+  if (!styleTag) { styleTag = document.createElement('style'); styleTag.id = 'pageStyle'; document.head.appendChild(styleTag); }
+  styleTag.textContent = `
+    @page { size: A4 ${v}; margin: 14mm 12mm; }
+    ${numerar ? `@page { @bottom-right { content: "Página " counter(page) " de " counter(pages); font-size: 9px; color: #555; } }` : ''}
+  `;
+}
+document.getElementById('orientacao').addEventListener('change', aplicarOrientacao);
+document.getElementById('chkNumPagina').addEventListener('change', aplicarOrientacao);
+
+// ── Colunas opcionais ─────────────────────────────────────────────────────────
+function toggleColuna(checkboxId, headerId, cellClass, colspanBase) {
+  const checked = document.getElementById(checkboxId).checked;
+  document.getElementById(headerId).style.display = checked ? '' : 'none';
+  document.querySelectorAll('.' + cellClass).forEach(td => td.style.display = checked ? '' : 'none');
+}
+document.getElementById('chkDescricao').addEventListener('change', () => toggleColuna('chkDescricao', 'thDescricao', 'col-descricao'));
+document.getElementById('chkCategoria').addEventListener('change', () => toggleColuna('chkCategoria', 'thCategoria', 'col-categoria'));
+
+// ── Rodapé opcional ───────────────────────────────────────────────────────────
+function atualizarRodape() {
+  const agora = new Date();
+  const partes = [];
+  if (document.getElementById('chkData').checked) partes.push('Data: ' + agora.toLocaleDateString('pt-BR'));
+  if (document.getElementById('chkHora').checked) partes.push('Hora: ' + agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+  document.getElementById('rodapeMeta').textContent = partes.join('   ·   ');
+  document.getElementById('rodapeAssinaturas').style.display = document.getElementById('chkAssinaturas').checked ? 'flex' : 'none';
+  document.getElementById('obsLivre').style.display = document.getElementById('chkObs').checked ? '' : 'none';
+}
+['chkData', 'chkHora', 'chkAssinaturas', 'chkObs'].forEach(id =>
+  document.getElementById(id).addEventListener('change', atualizarRodape)
+);
+
+document.getElementById('btnImprimirAgora').addEventListener('click', () => window.print());
+
+// ── Limpa o texto de exemplo dos campos editáveis no primeiro clique ────────────
+['instEdit', 'enderecoEdit'].forEach(id => {
+  const el = document.getElementById(id);
+  const placeholder = el.textContent;
+  el.addEventListener('focus', () => {
+    if (el.textContent === placeholder) el.textContent = '';
+  }, { once: true });
+});
+
+aplicarOrientacao();
+load();
+</script>
+</body>
+</html>

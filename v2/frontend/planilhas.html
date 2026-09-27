@@ -112,8 +112,9 @@ async function load() {
   document.getElementById('empty').classList.add('hidden');
   document.getElementById('semResultado').classList.add('hidden');
   const res = await apiFetch('/api/planilhas');
+  if (!res.ok) { document.getElementById('tbody').innerHTML = ''; return; }
   const { planilhas } = await res.json();
-  PLANILHAS = planilhas;
+  PLANILHAS = planilhas ?? [];
   if (!planilhas.length) { document.getElementById('tbody').innerHTML = ''; document.getElementById('empty').classList.remove('hidden'); return; }
   renderLista(PLANILHAS);
 }
