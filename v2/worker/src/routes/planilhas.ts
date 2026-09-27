@@ -88,6 +88,29 @@ app.delete('/:id', async (c) => {
   return c.json({ ok: true });
 });
 
+app.post('/:id/duplicar', async (c) => {
+  const user = c.get('user') as JWTPayload;
+  const planilha = await getPlanilha(c.env.DB, Number(c.req.param('id')));
+  if (!planilha) return c.json({ error: 'Não encontrado' }, 404);
+  if (!canAccess(user, planilha)) return c.json({ error: 'Sem acesso' }, 403);
+
+  const itens = await c.env.DB.prepare('SELECT * FROM itens WHERE planilha_id = ? ORDER BY ordem ASC')
+    .bind(planilha.id).all<ItemRow>();
+
+  const nova = await c.env.DB.prepare(
+    'INSERT INTO planilhas (titulo, descricao, numero_proc, criado_por) VALUES (?, ?, ?, ?) RETURNING *'
+  ).bind(`${planilha.titulo} (cópia)`, planilha.descricao, planilha.numero_proc, user.id).first<PlanilhaRow>();
+
+  if (itens.results.length) {
+    const stmts = itens.results.map(i => c.env.DB.prepare(
+      'INSERT INTO itens (planilha_id, categoria_id, n, ordem, item, descricao, unidade, quantidade, valor_unitario, valor_total) VALUES (?,?,?,?,?,?,?,?,?,?)'
+    ).bind(nova!.id, i.categoria_id, i.n, i.ordem, i.item, i.descricao, i.unidade, i.quantidade, i.valor_unitario, i.valor_total));
+    await c.env.DB.batch(stmts);
+  }
+
+  return c.json({ ok: true, planilha: nova }, 201);
+});
+
 // ── ITENS ─────────────────────────────────────────────────────────────────────
 
 app.post('/:id/itens', async (c) => {

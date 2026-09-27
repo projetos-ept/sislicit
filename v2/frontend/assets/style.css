@@ -259,7 +259,7 @@ td.col-actions { text-align: right; white-space: nowrap; }
   margin-bottom: 16px;
 }
 .new-item-panel.open { display: block; }
-.new-item-grid { display: grid; grid-template-columns: 1fr 1fr 80px 90px 120px 120px; gap: 8px; align-items: end; }
+.new-item-grid { display: grid; grid-template-columns: 1fr 1fr 80px 90px 120px 120px 160px; gap: 8px; align-items: end; }
 @media (max-width: 768px) { .new-item-grid { grid-template-columns: 1fr 1fr; } }
 
 /* ── Modal ───────────────────────────────────────────────────────────────── */

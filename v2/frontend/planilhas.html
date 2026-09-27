@@ -60,13 +60,29 @@
             <th>Nº processo</th>
             <th>Criado em</th>
             <th>Atualizado</th>
-            <th></th>
+            <th style="text-align:right;">Ações</th>
           </tr>
         </thead>
         <tbody id="tbody"></tbody>
       </table>
     </div>
     <div id="empty" class="card-body text-muted hidden" style="text-align:center;padding:40px;">Nenhuma planilha ainda.</div>
+  </div>
+</div>
+
+<!-- Rename modal -->
+<div id="renameModal" class="modal-backdrop">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Renomear planilha</h3>
+      <button class="btn btn-ghost" onclick="closeRename()">✕</button>
+    </div>
+    <div class="form-group"><label class="form-label">Título *</label><input id="rn-titulo" class="form-control"></div>
+    <div class="form-group"><label class="form-label">Nº processo</label><input id="rn-proc" class="form-control"></div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-primary" onclick="salvarRename()">Salvar</button>
+      <button class="btn btn-secondary" onclick="closeRename()">Cancelar</button>
+    </div>
   </div>
 </div>
 
@@ -77,14 +93,18 @@ requireAuth();
 
 const fmtDate = (s) => s ? new Date(s.replace(' ','T')+'Z').toLocaleDateString('pt-BR') : '—';
 
+let PLANILHAS = [];
+
 async function load() {
   const res = await apiFetch('/api/planilhas');
   const { planilhas } = await res.json();
+  PLANILHAS = planilhas;
   const tbody = document.getElementById('tbody');
   const empty = document.getElementById('empty');
   tbody.innerHTML = '';
   if (!planilhas.length) { empty.classList.remove('hidden'); return; }
   empty.classList.add('hidden');
+  const isAdmin = getUser()?.role === 'admin';
   planilhas.forEach(p => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -92,11 +112,51 @@ async function load() {
       <td class="text-muted mono">${p.numero_proc ?? '—'}</td>
       <td class="text-muted">${fmtDate(p.criado_em)}</td>
       <td class="text-muted">${fmtDate(p.atualizado_em)}</td>
-      <td style="text-align:right;">
+      <td style="text-align:right;white-space:nowrap;">
         <a href="detalhe.html?id=${p.id}" class="btn btn-secondary btn-sm">Abrir</a>
+        <button class="btn btn-ghost btn-sm" title="Renomear" onclick="openRename(${p.id})">✎</button>
+        <button class="btn btn-ghost btn-sm" title="Duplicar" onclick="duplicarPlanilha(${p.id})">⧉</button>
+        ${isAdmin ? `<button class="btn btn-ghost btn-sm" title="Excluir" style="color:var(--danger)" onclick="excluirPlanilha(${p.id})">🗑</button>` : ''}
       </td>`;
     tbody.appendChild(tr);
   });
+}
+
+function openRename(id) {
+  const p = PLANILHAS.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('renameModal').dataset.id = id;
+  document.getElementById('rn-titulo').value = p.titulo;
+  document.getElementById('rn-proc').value = p.numero_proc ?? '';
+  document.getElementById('renameModal').classList.add('open');
+}
+function closeRename() { document.getElementById('renameModal').classList.remove('open'); }
+
+async function salvarRename() {
+  const id = Number(document.getElementById('renameModal').dataset.id);
+  const titulo = document.getElementById('rn-titulo').value.trim();
+  if (!titulo) { toast('Título obrigatório', 'err'); return; }
+  const res = await apiFetch(`/api/planilhas/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ titulo, numero_proc: document.getElementById('rn-proc').value.trim() || null }),
+  });
+  if (res.ok) { closeRename(); load(); toast('Renomeado', 'ok'); }
+  else toast((await res.json()).error ?? 'Erro', 'err');
+}
+
+async function duplicarPlanilha(id) {
+  const res = await apiFetch(`/api/planilhas/${id}/duplicar`, { method: 'POST' });
+  const d = await res.json();
+  if (res.ok) { toast('Planilha duplicada', 'ok'); load(); }
+  else toast(d.error ?? 'Erro', 'err');
+}
+
+async function excluirPlanilha(id) {
+  if (!confirm('Excluir esta planilha e todos os seus itens? Essa ação não pode ser desfeita.')) return;
+  const res = await apiFetch(`/api/planilhas/${id}`, { method: 'DELETE' });
+  const d = await res.json();
+  if (res.ok) { toast('Planilha excluída', 'ok'); load(); }
+  else toast(d.error ?? 'Erro', 'err');
 }
 
 function openNova()  { document.getElementById('novaPanel').style.display = ''; document.getElementById('nv-titulo').focus(); }

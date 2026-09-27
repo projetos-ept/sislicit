@@ -112,6 +112,18 @@
       <div class="form-group" style="margin:0"><label class="form-label">Qtd.</label><input id="ni-qtd" class="form-control" type="number" min="0" value="1"></div>
       <div class="form-group" style="margin:0"><label class="form-label">Vl. Unit.</label><input id="ni-vu" class="form-control" type="number" min="0" step="0.01" value="0"></div>
       <div class="form-group" style="margin:0"><label class="form-label">Total</label><input id="ni-vt" class="form-control mono" readonly value="R$ 0,00"></div>
+      <div class="form-group" style="margin:0">
+        <label class="form-label">Categoria</label>
+        <select id="ni-cat" class="form-control" onchange="onNiCatChange()">
+          <option value="">— Sem categoria</option>
+          <option value="__nova__">+ Nova categoria…</option>
+        </select>
+      </div>
+    </div>
+    <div id="ni-novaCat" style="display:none;gap:8px;align-items:end;margin-top:8px;">
+      <div class="form-group" style="margin:0"><label class="form-label">Nome da categoria</label><input id="ni-cat-nome" class="form-control" placeholder="Ex.: Mobiliário"></div>
+      <div class="form-group" style="margin:0"><label class="form-label">Cor</label><input id="ni-cat-cor" type="color" class="form-control" value="#6366f1" style="padding:2px;height:38px;"></div>
+      <button class="btn btn-secondary btn-sm" onclick="criarCategoriaInline()">Criar</button>
     </div>
     <div style="display:flex;gap:8px;margin-top:12px;">
       <button class="btn btn-primary btn-sm" onclick="addItem()">Adicionar</button>
@@ -155,6 +167,7 @@ async function load() {
   if (!res.ok) { toast('Erro ao carregar planilha', 'err'); return; }
   const d = await res.json();
   CATS = d.categorias ?? [];
+  populateNiCat();
 
   document.title = `SisLicit — ${d.planilha.titulo}`;
   document.getElementById('titulo').textContent = d.planilha.titulo;
@@ -436,6 +449,42 @@ function previewTotal() {
   document.getElementById('ni-vt').value = fmtBRL(qtd * vu);
 }
 
+function populateNiCat() {
+  const sel = document.getElementById('ni-cat');
+  const atual = sel.value;
+  sel.innerHTML = '<option value="">— Sem categoria</option>' +
+    CATS.map(c => `<option value="${c.id}">${c.nome}</option>`).join('') +
+    '<option value="__nova__">+ Nova categoria…</option>';
+  if (CATS.some(c => String(c.id) === atual)) sel.value = atual;
+}
+
+function onNiCatChange() {
+  const sel = document.getElementById('ni-cat');
+  const painel = document.getElementById('ni-novaCat');
+  if (sel.value === '__nova__') {
+    painel.style.display = 'flex';
+    document.getElementById('ni-cat-nome').focus();
+  } else {
+    painel.style.display = 'none';
+  }
+}
+
+async function criarCategoriaInline() {
+  const nome = document.getElementById('ni-cat-nome').value.trim();
+  if (!nome) { toast('Nome da categoria obrigatório', 'err'); return; }
+  const cor_hex = document.getElementById('ni-cat-cor').value;
+  const res = await apiFetch('/api/categorias', { method: 'POST', body: JSON.stringify({ nome, cor_hex }) });
+  const d = await res.json();
+  if (res.ok) {
+    CATS.push(d.categoria);
+    populateNiCat();
+    document.getElementById('ni-cat').value = d.categoria.id;
+    document.getElementById('ni-novaCat').style.display = 'none';
+    document.getElementById('ni-cat-nome').value = '';
+    toast('Categoria criada', 'ok');
+  } else toast(d.error ?? 'Erro', 'err');
+}
+
 async function addItem() {
   const item = document.getElementById('ni-item').value.trim();
   if (!item) { toast('Nome obrigatório', 'err'); return; }
@@ -447,10 +496,13 @@ async function addItem() {
       unidade:        document.getElementById('ni-unid').value.trim() || null,
       quantidade:     parseFloat(document.getElementById('ni-qtd').value) || 0,
       valor_unitario: parseFloat(document.getElementById('ni-vu').value)  || 0,
+      categoria_id:   document.getElementById('ni-cat').value ? Number(document.getElementById('ni-cat').value) : null,
     }),
   });
   const d = await res.json();
   if (d.ok) {
+    const cat = CATS.find(c => c.id === d.item.categoria_id);
+    if (cat) Object.assign(d.item, { cat_nome: cat.nome, cat_cor: cat.cor_hex, cat_cor_borda: cat.cor_borda_hex, cat_cor_texto: cat.cor_texto_hex });
     appendRow(d.item);
     updateTotalHeader(d.total_fmt, d.total_itens);
     document.getElementById('tbEmpty').classList.add('hidden');
@@ -458,6 +510,7 @@ async function addItem() {
     document.getElementById('ni-qtd').value = '1';
     document.getElementById('ni-vu').value  = '0';
     document.getElementById('ni-vt').value  = fmtBRL(0);
+    document.getElementById('ni-cat').value = '';
     toast('Item adicionado', 'ok');
   } else toast(d.error ?? 'Erro', 'err');
 }
