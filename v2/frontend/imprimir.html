@@ -32,6 +32,13 @@
       box-shadow: 0 4px 24px rgba(0,0,0,0.35);
       font-family: var(--font);
     }
+    /* Sem isso, a maioria dos navegadores omite cores de fundo ao imprimir,
+       mesmo com a cor definida inline na linha da tabela. */
+    .folha, .folha * {
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+      color-adjust: exact;
+    }
     .folha.paisagem { width: 297mm; min-height: 210mm; }
 
     .cab-topo { display: flex; align-items: center; gap: 16px; border-bottom: 2px solid #14161f; padding-bottom: 12px; margin-bottom: 16px; }
@@ -101,6 +108,7 @@
   <div class="toolbar-group">
     <label><input type="checkbox" id="chkDescricao" checked> Descrição</label>
     <label><input type="checkbox" id="chkCategoria" checked> Categoria</label>
+    <label><input type="checkbox" id="chkCoresCategoria"> Cores das categorias</label>
   </div>
 
   <div class="toolbar-group">
@@ -172,6 +180,8 @@ const PID = new URLSearchParams(location.search).get('id');
 if (!PID) location.href = 'planilhas.html';
 document.getElementById('btnVoltar').href = `detalhe.html?id=${PID}`;
 
+let ITENS = [];
+
 async function load() {
   const res = await apiFetch(`/api/planilhas/${PID}`);
   if (!res.ok) { toast('Erro ao carregar planilha', 'err'); return; }
@@ -182,9 +192,20 @@ async function load() {
   document.getElementById('subEdit').textContent = [d.planilha.numero_proc, d.planilha.descricao].filter(Boolean).join(' · ');
   document.getElementById('tdTotalValor').textContent = d.total_fmt;
 
+  ITENS = d.itens;
+  renderTabela();
+  atualizarRodape();
+}
+
+function renderTabela() {
+  const comCores = document.getElementById('chkCoresCategoria').checked;
   const tbody = document.getElementById('corpoTabela');
-  tbody.innerHTML = d.itens.map(it => `
-    <tr>
+  tbody.innerHTML = ITENS.map(it => {
+    const estilo = (comCores && it.cat_cor)
+      ? ` style="background:${it.cat_cor};color:${it.cat_cor_texto ?? ''};border-left:4px solid ${it.cat_cor_borda ?? it.cat_cor};"`
+      : '';
+    return `
+    <tr${estilo}>
       <td>${it.n}</td>
       <td>${it.item}</td>
       <td class="col-descricao">${it.descricao ?? ''}</td>
@@ -193,11 +214,13 @@ async function load() {
       <td class="num">${fmtBRL(it.valor_unitario)}</td>
       <td class="num">${fmtBRL(it.valor_total)}</td>
       <td class="col-categoria">${it.cat_nome ?? ''}</td>
-    </tr>
-  `).join('');
-
-  atualizarRodape();
+    </tr>`;
+  }).join('');
+  toggleColuna('chkDescricao', 'thDescricao', 'col-descricao');
+  toggleColuna('chkCategoria', 'thCategoria', 'col-categoria');
 }
+
+document.getElementById('chkCoresCategoria').addEventListener('change', renderTabela);
 
 // ── Logo ─────────────────────────────────────────────────────────────────────
 document.getElementById('cabLogo').addEventListener('click', () => document.getElementById('logoInput').click());

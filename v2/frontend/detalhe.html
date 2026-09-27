@@ -263,12 +263,28 @@ function aplicarFiltroItens() {
 document.getElementById('buscaItens').addEventListener('input', aplicarFiltroItens);
 
 // ── Build row ─────────────────────────────────────────────────────────────────
+function pintarLinha(tr, it) {
+  const colN = tr.querySelector('.col-n');
+  if (it.cat_nome && it.cat_cor) {
+    tr.style.background = it.cat_cor;
+    tr.style.color = it.cat_cor_texto ?? '';
+    tr.style.borderLeft = `4px solid ${it.cat_cor_borda ?? it.cat_cor}`;
+    if (colN) colN.style.color = it.cat_cor_texto ?? '';
+  } else {
+    tr.style.background = '';
+    tr.style.color = '';
+    tr.style.borderLeft = '';
+    if (colN) colN.style.color = '';
+  }
+}
+
 function appendRow(it) {
   const tr = document.createElement('tr');
   tr.dataset.id  = it.id;
   tr.dataset.cat = it.categoria_id ?? '';
   tr.innerHTML = buildRowHTML(it);
   attachRowEvents(tr, it.id);
+  pintarLinha(tr, it);
   document.getElementById('tableBody').appendChild(tr);
 }
 
@@ -385,6 +401,7 @@ async function flushRow(itemId) {
     const vtTd = tr.querySelector('[data-vtotal]');
     if (vtTd) { vtTd.querySelector('.cell-display').textContent = d.valor_total_fmt; vtTd.dataset.raw = d.valor_total; }
     document.getElementById('totalGeral').textContent = d.planilha_total_fmt;
+    pintarLinha(tr, d.item);
     recomputeCatChips();
   } else {
     toast(d.error ?? 'Erro ao salvar', 'err');
@@ -427,6 +444,7 @@ async function setCategoria(itemId, catId) {
     } else {
       zone.innerHTML = `<span class="cat-none" onclick="openCatDropdown(event,${itemId})">— categoria</span>`;
     }
+    pintarLinha(tr, d.item);
     recomputeCatChips();
   }
 }
@@ -442,6 +460,7 @@ async function clonarItem(itemId) {
     newTr.dataset.cat = d.item.categoria_id ?? '';
     newTr.innerHTML = buildRowHTML(d.item);
     attachRowEvents(newTr, d.item.id);
+    pintarLinha(newTr, d.item);
     tr.insertAdjacentElement('afterend', newTr);
     toast('Item clonado', 'ok');
     renumberDisplay();
