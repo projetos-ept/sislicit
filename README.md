@@ -47,6 +47,7 @@ Nenhuma dependência externa de criptografia/JWT — tudo via `crypto.subtle` na
 - CRUD de **categorias** (cor customizável, com variantes de borda/texto calculadas automaticamente via HSV); qualquer usuário autenticado pode criar uma nova categoria direto do formulário de item.
 - **Exportação**: Excel (.xlsx) e JSON, por planilha inteira ou seleção de itens.
 - **Importação via JSON**, incluindo um prompt pronto (aba "Importar via IA" no Admin) para gerar esse JSON a partir do texto de um pedido/edital usando qualquer IA de texto.
+- **Impressão/PDF** (`imprimir.html`): folha A4 com cabeçalho editável (logo, nome da instituição, endereço — só para a impressão, não é salvo), orientação retrato/paisagem, colunas e rodapé (data, hora, assinaturas, observações, numeração de página) opcionais via checkbox. Gera o PDF pelo diálogo nativo de impressão do navegador (`window.print()`).
 - Painel **Admin**: dashboard com contadores, gestão de usuários (criar, editar, trocar senha, desativar) e categorias.
 - Tema **claro/escuro**, com preferência salva no navegador.
 - Conveniências de UX: busca client-side em planilhas e itens, subtotal por categoria nos chips de filtro, indicador de carregamento (skeleton) nas listagens, botões desabilitados durante requisições (evita duplo-clique), atalhos de teclado (Enter para salvar, Esc para fechar modais) e opção de mostrar/ocultar senha nos campos de login e cadastro.
@@ -61,6 +62,7 @@ v2/
 │   ├── index.html                # login
 │   ├── planilhas.html            # listagem de planilhas
 │   ├── detalhe.html              # itens de uma planilha
+│   ├── imprimir.html             # folha de impressão/PDF de uma planilha
 │   ├── admin.html                # painel administrativo
 │   └── assets/
 │       ├── app.js                # utilitários compartilhados (auth, fetch, tema, toast)
