@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
-import * as XLSX from 'xlsx';
 import type { Env } from '../index';
 import type { JWTPayload } from '../auth';
 import { fmtBRL, renumerar, touchPlanilha } from '../utils';
+import { gerarXlsxPlanilha } from '../xlsx-writer';
 
 type PlanilhaRow = { id: number; titulo: string; descricao: string | null; numero_proc: string | null; criado_por: number; criado_em: string; atualizado_em: string };
 type ItemRow     = { id: number; planilha_id: number; categoria_id: number | null; n: number; ordem: number; item: string; descricao: string | null; unidade: string | null; quantidade: number; valor_unitario: number; valor_total: number; cat_nome?: string; cat_cor?: string; cat_cor_borda?: string; cat_cor_texto?: string };
@@ -333,7 +333,7 @@ app.get('/:id/export/json', async (c) => {
   });
 });
 
-// ── EXPORT EXCEL (SheetJS) ────────────────────────────────────────────────────
+// ── EXPORT EXCEL (gerador próprio — ver xlsx-writer.ts) ────────────────────────
 
 app.get('/:id/export/excel', async (c) => {
   const user = c.get('user') as JWTPayload;
@@ -342,26 +342,15 @@ app.get('/:id/export/excel', async (c) => {
   if (!canAccess(user, planilha)) return c.json({ error: 'Sem acesso' }, 403);
 
   const itens = await c.env.DB.prepare(`
-    SELECT i.*, c.nome AS cat_nome FROM itens i
-    LEFT JOIN categorias c ON i.categoria_id = c.id
+    SELECT i.*, c.nome AS cat_nome, c.cor_hex AS cat_cor, c.cor_borda_hex AS cat_cor_borda, c.cor_texto_hex AS cat_cor_texto
+    FROM itens i LEFT JOIN categorias c ON i.categoria_id = c.id
     WHERE i.planilha_id = ? ORDER BY i.ordem ASC
-  `).bind(planilha.id).all<ItemRow & { cat_nome: string | null }>();
+  `).bind(planilha.id).all<ItemRow & { cat_nome: string | null; cat_cor: string | null; cat_cor_borda: string | null; cat_cor_texto: string | null }>();
 
   const total = itens.results.reduce((s, i) => s + i.valor_total, 0);
+  const titulo = [planilha.titulo, planilha.numero_proc ? `— ${planilha.numero_proc}` : ''].filter(Boolean).join(' ');
+  const buf = gerarXlsxPlanilha(titulo, itens.results, total);
 
-  const rows: unknown[][] = [
-    ['N°', 'Item', 'Descrição', 'Unidade', 'Qtd.', 'Vl. Unit.', 'Vl. Total', 'Categoria'],
-    ...itens.results.map(i => [i.n, i.item, i.descricao ?? '', i.unidade ?? '', i.quantidade, i.valor_unitario, i.valor_total, i.cat_nome ?? '']),
-    [],
-    ['', '', '', '', '', 'TOTAL GERAL', total, ''],
-  ];
-
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols'] = [4, 30, 40, 8, 8, 12, 12, 16].map(w => ({ wch: w }));
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Planilha');
-
-  const buf: ArrayBuffer = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
   const safe = planilha.titulo.replace(/[^a-z0-9]/gi, '_').slice(0, 40);
   return new Response(buf, {
     headers: {
@@ -384,20 +373,13 @@ app.post('/:id/bulk/xlsx', async (c) => {
 
   const ph = ids.map(() => '?').join(',');
   const itens = await c.env.DB.prepare(
-    `SELECT i.*, c.nome AS cat_nome FROM itens i LEFT JOIN categorias c ON i.categoria_id = c.id WHERE i.id IN (${ph}) ORDER BY i.ordem ASC`
-  ).bind(...ids).all<ItemRow & { cat_nome: string | null }>();
+    `SELECT i.*, c.nome AS cat_nome, c.cor_hex AS cat_cor, c.cor_borda_hex AS cat_cor_borda, c.cor_texto_hex AS cat_cor_texto
+     FROM itens i LEFT JOIN categorias c ON i.categoria_id = c.id WHERE i.id IN (${ph}) ORDER BY i.ordem ASC`
+  ).bind(...ids).all<ItemRow & { cat_nome: string | null; cat_cor: string | null; cat_cor_borda: string | null; cat_cor_texto: string | null }>();
 
   const total = itens.results.reduce((s, i) => s + i.valor_total, 0);
-  const rows: unknown[][] = [
-    ['N°', 'Item', 'Descrição', 'Unidade', 'Qtd.', 'Vl. Unit.', 'Vl. Total', 'Categoria'],
-    ...itens.results.map(i => [i.n, i.item, i.descricao ?? '', i.unidade ?? '', i.quantidade, i.valor_unitario, i.valor_total, i.cat_nome ?? '']),
-    [], ['', '', '', '', '', 'TOTAL', total, ''],
-  ];
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols'] = [4, 30, 40, 8, 8, 12, 12, 16].map(w => ({ wch: w }));
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Seleção');
-  const buf: ArrayBuffer = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+  const buf = gerarXlsxPlanilha(`${planilha.titulo} — Seleção`, itens.results, total);
+
   return new Response(buf, {
     headers: {
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
