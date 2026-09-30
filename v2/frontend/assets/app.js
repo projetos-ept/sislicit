@@ -6,6 +6,39 @@
 // <script>window.API_BASE = 'https://sislicit-api.projetos-ept.workers.dev';</script>
 const API_BASE = window.API_BASE ?? '';
 
+// ── Prompt de importação via IA (compartilhado entre Admin e a tela de item) ────
+const PROMPT_IMPORTAR_IA = `Você é um assistente que transforma um pedido de compra/licitação em um JSON estruturado para importação no sistema SisLicit.
+
+Regras:
+- Responda APENAS com o JSON puro, sem texto antes ou depois, sem markdown (sem \`\`\`).
+- O formato de saída é um array de itens, seguindo exatamente este schema:
+  [
+    { "item": "string (obrigatório)", "descricao": "string (opcional)", "unidade": "string (opcional, ex: UN, CX, KG)", "quantidade": number, "valor_unitario": number }
+  ]
+- Não inclua "valor_total" — ele é calculado automaticamente (quantidade × valor_unitario).
+- Extraia quantidade e unidade do texto sempre que possível (ex.: "10 cadeiras" → quantidade: 10, unidade: "UN").
+- Se o valor unitário não for informado no pedido, use 0.
+- Um item por linha/produto do pedido; não agrupe itens diferentes.
+
+Exemplo de saída válida:
+[
+  { "item": "Cadeira de escritório giratória", "descricao": "Com apoio de braço, cor preta", "unidade": "UN", "quantidade": 10, "valor_unitario": 350.00 },
+  { "item": "Mesa de reunião 6 lugares", "unidade": "UN", "quantidade": 2, "valor_unitario": 1200.00 },
+  { "item": "Resma de papel A4", "unidade": "CX", "quantidade": 5, "valor_unitario": 22.90 }
+]
+
+Pedido a transformar (cole abaixo, entre as aspas triplas):
+"""
+COLE AQUI O TEXTO DO PEDIDO/EDITAL
+"""`;
+
+function copiarPromptImportarIA() {
+  navigator.clipboard.writeText(PROMPT_IMPORTAR_IA).then(
+    () => toast('Prompt copiado — cole numa IA junto com o texto do pedido', 'ok'),
+    () => toast('Não foi possível copiar — selecione o texto manualmente', 'err')
+  );
+}
+
 // ── Paleta padrão de cores para categorias ───────────────────────────────────────
 // Tons claros/pastel: o backend (calcularVariantes) escurece/satura pra gerar
 // borda e texto legíveis a partir dessa cor base, então cores claras aqui

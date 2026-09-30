@@ -78,7 +78,7 @@
       </p>
       <textarea id="ia-prompt" class="form-control mono" rows="16" readonly style="font-size:0.78rem;line-height:1.5;"></textarea>
       <div style="display:flex;gap:8px;margin-top:12px;">
-        <button class="btn btn-primary btn-sm" onclick="copiarPromptIA()">📋 Copiar prompt</button>
+        <button class="btn btn-primary btn-sm" onclick="copiarPromptImportarIA()">📋 Copiar prompt</button>
       </div>
     </div>
   </div>
@@ -324,39 +324,6 @@ async function deleteCat(id, name) {
   else toast(d.error ?? 'Erro', 'err');
 }
 
-// ── Importar via IA ─────────────────────────────────────────────────────────────
-const PROMPT_IA = `Você é um assistente que transforma um pedido de compra/licitação em um JSON estruturado para importação no sistema SisLicit.
-
-Regras:
-- Responda APENAS com o JSON puro, sem texto antes ou depois, sem markdown (sem \`\`\`).
-- O formato de saída é um array de itens, seguindo exatamente este schema:
-  [
-    { "item": "string (obrigatório)", "descricao": "string (opcional)", "unidade": "string (opcional, ex: UN, CX, KG)", "quantidade": number, "valor_unitario": number }
-  ]
-- Não inclua "valor_total" — ele é calculado automaticamente (quantidade × valor_unitario).
-- Extraia quantidade e unidade do texto sempre que possível (ex.: "10 cadeiras" → quantidade: 10, unidade: "UN").
-- Se o valor unitário não for informado no pedido, use 0.
-- Um item por linha/produto do pedido; não agrupe itens diferentes.
-
-Exemplo de saída válida:
-[
-  { "item": "Cadeira de escritório giratória", "descricao": "Com apoio de braço, cor preta", "unidade": "UN", "quantidade": 10, "valor_unitario": 350.00 },
-  { "item": "Mesa de reunião 6 lugares", "unidade": "UN", "quantidade": 2, "valor_unitario": 1200.00 },
-  { "item": "Resma de papel A4", "unidade": "CX", "quantidade": 5, "valor_unitario": 22.90 }
-]
-
-Pedido a transformar (cole abaixo, entre as aspas triplas):
-"""
-COLE AQUI O TEXTO DO PEDIDO/EDITAL
-"""`;
-
-function copiarPromptIA() {
-  navigator.clipboard.writeText(PROMPT_IA).then(
-    () => toast('Prompt copiado', 'ok'),
-    () => toast('Não foi possível copiar — selecione o texto manualmente', 'err')
-  );
-}
-
 // ── Sincronização manual ─────────────────────────────────────────────────────────
 function atualizarSyncInfo() {
   const n = offlineQueueCount();
@@ -380,7 +347,7 @@ async function sincronizarAgora() {
 document.getElementById('btn-sync').addEventListener('click', sincronizarAgora);
 
 // ── Init ──────────────────────────────────────────────────────────────────────
-document.getElementById('ia-prompt').value = PROMPT_IA;
+document.getElementById('ia-prompt').value = PROMPT_IMPORTAR_IA;
 loadDashboard(); loadUsers(); loadCats();
 atualizarSyncInfo();
 setInterval(atualizarSyncInfo, 2000);

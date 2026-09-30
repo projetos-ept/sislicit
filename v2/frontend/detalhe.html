@@ -31,6 +31,7 @@
       <p id="subtitulo" class="text-muted" style="font-size:0.82rem;margin-top:2px;"></p>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn btn-secondary btn-sm" onclick="copiarPromptImportarIA()" title="Copia um prompt pronto pra gerar o JSON de importação numa IA">📋 Prompt IA</button>
       <button class="btn btn-secondary btn-sm" onclick="agrupar()">⊞ Agrupar cat.</button>
       <a id="btnImprimir" href="#" class="btn btn-secondary btn-sm" target="_blank" rel="noopener">🖨 Imprimir</a>
       <a id="btnExcelFull" href="#" class="btn btn-secondary btn-sm" onclick="exportExcel(event)">⬇ Excel</a>
@@ -117,7 +118,6 @@
             <th>Qtd.<span class="sort-btn" id="sb-qtd" onclick="sortTable('qtd',this,'th-qtd')"><span class="arr-up">▲</span><span class="arr-down">▼</span></span></th>
             <th id="th-vunit">Vl. Unit.<span class="sort-btn" id="sb-vunit" onclick="sortTable('vunit',this,'th-vunit')"><span class="arr-up">▲</span><span class="arr-down">▼</span></span></th>
             <th id="th-vtotal">Vl. Total<span class="sort-btn" id="sb-vtotal" onclick="sortTable('vtotal',this,'th-vtotal')"><span class="arr-up">▲</span><span class="arr-down">▼</span></span></th>
-            <th>Categoria</th>
             <th>Ações</th>
           </tr>
         </thead>
@@ -320,13 +320,15 @@ function buildRowHTML(it) {
   return `
     <td><input type="checkbox" class="row-check" data-id="${it.id}" onchange="updateBulkBar()"></td>
     <td class="col-n">${it.n}</td>
-    <td><span class="cell-display" data-campo="item" data-id="${it.id}">${it.item}</span></td>
+    <td>
+      <div class="cat-zone" data-id="${it.id}" style="margin-bottom:4px;">${catBadge}</div>
+      <span class="cell-display" data-campo="item" data-id="${it.id}">${it.item}</span>
+    </td>
     <td><span class="cell-display" data-campo="descricao" data-id="${it.id}">${it.descricao ?? ''}</span></td>
     <td><span class="cell-display" data-campo="unidade" data-id="${it.id}">${it.unidade ?? ''}</span></td>
     <td><span class="cell-display num" data-campo="quantidade" data-id="${it.id}">${it.quantidade}</span></td>
     <td><span class="cell-display num" data-campo="valor_unitario" data-id="${it.id}">${it.valor_unitario}</span></td>
     <td data-vtotal data-raw="${it.valor_total ?? 0}"><span class="cell-display num">${fmtBRL(it.valor_total)}</span></td>
-    <td class="cat-zone" data-id="${it.id}">${catBadge}</td>
     <td class="col-actions">
       <button class="btn btn-ghost btn-sm" title="Clonar" onclick="clonarItem(${it.id})">⧉</button>
       <button class="btn btn-ghost btn-sm" title="Excluir" style="color:var(--danger)" onclick="excluirItem(${it.id})">🗑</button>
@@ -338,21 +340,20 @@ function attachRowEvents(tr, itemId) {
   tr.querySelectorAll('.cell-display').forEach(span => {
     span.addEventListener('click', () => activateCell(span, itemId));
   });
-
-  // Row-level focusout → sync if dirty
-  tr.addEventListener('focusout', (e) => {
-    if (tr.contains(e.relatedTarget)) return;
-    flushRow(itemId);
-  });
 }
+
+// ── Edição inline: só uma célula aberta por vez (igual ao sistema legado) ──────
+let _activeCellSpan = null;
+let _activeCellItemId = null;
+let _activeCellCampo = null;
 
 function activateCell(span, itemId) {
   if (span.querySelector('input')) return;
+  closeActiveCell();
+
   const campo = span.dataset.campo;
   const isNum = span.classList.contains('num');
-  const current = isNum
-    ? (pendingChanges.get(itemId)?.[campo] ?? span.textContent.trim())
-    : (pendingChanges.get(itemId)?.[campo] ?? span.textContent.trim());
+  const current = pendingChanges.get(itemId)?.[campo] ?? span.textContent.trim();
 
   const input = document.createElement('input');
   input.type = isNum ? 'number' : 'text';
@@ -373,17 +374,46 @@ function activateCell(span, itemId) {
   });
 
   input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { input.blur(); }
+    if (e.key === 'Enter') { e.preventDefault(); closeActiveCell(); }
     if (e.key === 'Escape') {
       // Discard changes for this cell
       const changes = pendingChanges.get(itemId);
       if (changes) delete changes[campo];
+      _activeCellSpan = null; _activeCellItemId = null; _activeCellCampo = null;
       restoreCellDisplay(span, campo, current);
     }
   });
 
-  // blur is handled by row focusout
+  _activeCellSpan = span;
+  _activeCellItemId = itemId;
+  _activeCellCampo = campo;
 }
+
+// Fecha a célula em edição atual: salva (via flushRow) se houve mudança nela,
+// ou só restaura o texto se o usuário clicou e saiu sem digitar nada.
+function closeActiveCell() {
+  if (!_activeCellSpan) return;
+  const span = _activeCellSpan, itemId = _activeCellItemId, campo = _activeCellCampo;
+  _activeCellSpan = null; _activeCellItemId = null; _activeCellCampo = null;
+
+  const input = span.querySelector('input');
+  if (!input) return;
+  const changes = pendingChanges.get(itemId);
+  if (changes && campo in changes) {
+    flushRow(itemId);
+  } else {
+    span.innerHTML = '';
+    span.textContent = input.value;
+  }
+}
+
+// Clique fora de qualquer célula em edição fecha ela (equivalente a um "blur" global).
+// Importante: usa 'click', não 'mousedown' — fechar no mousedown muda o layout
+// (a célula antiga encolhe) ANTES do clique "pousar", fazendo o clique errar o
+// alvo quando a célula nova fica na mesma posição/linha.
+document.addEventListener('click', (e) => {
+  if (_activeCellSpan && !_activeCellSpan.contains(e.target)) closeActiveCell();
+});
 
 function restoreCellDisplay(span, campo, value) {
   const isNum = ['quantidade','valor_unitario'].includes(campo);

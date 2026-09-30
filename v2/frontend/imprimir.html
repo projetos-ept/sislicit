@@ -143,19 +143,18 @@
           <th style="width:32px;">N°</th>
           <th>Item</th>
           <th id="thDescricao">Descrição</th>
+          <th id="thCategoria" style="width:100px;">Categoria</th>
           <th style="width:50px;">Unid.</th>
           <th class="num" style="width:55px;">Qtd.</th>
           <th class="num" style="width:80px;">Vl. Unit.</th>
           <th class="num" style="width:90px;">Vl. Total</th>
-          <th id="thCategoria" style="width:100px;">Categoria</th>
         </tr>
       </thead>
       <tbody id="corpoTabela"></tbody>
       <tfoot>
         <tr>
-          <td id="tdTotalLabel" colspan="6">TOTAL GERAL</td>
+          <td id="tdTotalLabel" colspan="7">TOTAL GERAL</td>
           <td class="num" id="tdTotalValor"></td>
-          <td id="tdTotalCatSpacer"></td>
         </tr>
       </tfoot>
     </table>
@@ -209,11 +208,11 @@ function renderTabela() {
       <td>${it.n}</td>
       <td>${it.item}</td>
       <td class="col-descricao">${it.descricao ?? ''}</td>
+      <td class="col-categoria">${it.cat_nome ?? ''}</td>
       <td>${it.unidade ?? ''}</td>
       <td class="num">${it.quantidade}</td>
       <td class="num">${fmtBRL(it.valor_unitario)}</td>
       <td class="num">${fmtBRL(it.valor_total)}</td>
-      <td class="col-categoria">${it.cat_nome ?? ''}</td>
     </tr>`;
   }).join('');
   toggleColuna('chkDescricao', 'thDescricao', 'col-descricao');
@@ -222,15 +221,47 @@ function renderTabela() {
 
 document.getElementById('chkCoresCategoria').addEventListener('change', renderTabela);
 
+// ── Cabeçalho (logo, instituição, endereço) salvo no navegador ────────────────
+// Não vem da API — é só do dispositivo/navegador de quem imprime, então fica
+// em localStorage pra não precisar redigitar toda vez que abrir a impressão.
+const CABECALHO_STORAGE_KEY = 'sl_imprimir_cabecalho';
+
+function salvarCabecalho() {
+  try {
+    localStorage.setItem(CABECALHO_STORAGE_KEY, JSON.stringify({
+      instituicao: document.getElementById('instEdit').textContent,
+      endereco: document.getElementById('enderecoEdit').textContent,
+      logo: document.getElementById('cabLogo').querySelector('img')?.src ?? null,
+    }));
+  } catch {}
+}
+
+function carregarCabecalho() {
+  try {
+    const raw = localStorage.getItem(CABECALHO_STORAGE_KEY);
+    if (!raw) return;
+    const d = JSON.parse(raw);
+    if (d.instituicao) document.getElementById('instEdit').textContent = d.instituicao;
+    if (d.endereco) document.getElementById('enderecoEdit').textContent = d.endereco;
+    if (d.logo) document.getElementById('cabLogo').innerHTML = `<img src="${d.logo}">`;
+  } catch {}
+}
+
 // ── Logo ─────────────────────────────────────────────────────────────────────
 document.getElementById('cabLogo').addEventListener('click', () => document.getElementById('logoInput').click());
 document.getElementById('logoInput').addEventListener('change', (e) => {
   const file = e.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = () => { document.getElementById('cabLogo').innerHTML = `<img src="${reader.result}">`; };
+  reader.onload = () => {
+    document.getElementById('cabLogo').innerHTML = `<img src="${reader.result}">`;
+    salvarCabecalho();
+  };
   reader.readAsDataURL(file);
 });
+
+document.getElementById('instEdit').addEventListener('input', salvarCabecalho);
+document.getElementById('enderecoEdit').addEventListener('input', salvarCabecalho);
 
 // ── Orientação + numeração de página (ambos reescrevem a regra @page) ──────────
 function aplicarOrientacao() {
@@ -281,6 +312,7 @@ document.getElementById('btnImprimirAgora').addEventListener('click', () => wind
   }, { once: true });
 });
 
+carregarCabecalho();
 aplicarOrientacao();
 load();
 </script>
