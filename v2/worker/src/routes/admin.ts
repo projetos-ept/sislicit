@@ -13,16 +13,18 @@ app.use('*', async (c, next) => {
 });
 
 app.get('/dashboard', async (c) => {
-  const [planilhas, itens, categorias, usuarios] = await c.env.DB.batch([
+  const [planilhas, itens, categorias, unidades, usuarios] = await c.env.DB.batch([
     c.env.DB.prepare('SELECT COUNT(*) AS c FROM planilhas'),
     c.env.DB.prepare('SELECT COUNT(*) AS c FROM itens'),
     c.env.DB.prepare('SELECT COUNT(*) AS c FROM categorias'),
+    c.env.DB.prepare('SELECT COUNT(*) AS c FROM unidades'),
     c.env.DB.prepare('SELECT COUNT(*) AS c FROM users'),
   ]);
   return c.json({
     total_planilhas:  (planilhas.results[0] as { c: number }).c,
     total_itens:      (itens.results[0]     as { c: number }).c,
     total_categorias: (categorias.results[0] as { c: number }).c,
+    total_unidades:   (unidades.results[0]   as { c: number }).c,
     total_usuarios:   (usuarios.results[0]  as { c: number }).c,
   });
 });

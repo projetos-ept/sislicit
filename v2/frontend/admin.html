@@ -28,10 +28,11 @@
   </div>
 
   <!-- Dashboard counters -->
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:28px;" id="counters">
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:28px;" id="counters">
     <div class="card card-body"><p class="text-muted" style="font-size:0.75rem;text-transform:uppercase;">Planilhas</p><p id="c-planilhas" style="font-size:1.6rem;font-weight:700;">—</p></div>
     <div class="card card-body"><p class="text-muted" style="font-size:0.75rem;text-transform:uppercase;">Itens</p><p id="c-itens" style="font-size:1.6rem;font-weight:700;">—</p></div>
     <div class="card card-body"><p class="text-muted" style="font-size:0.75rem;text-transform:uppercase;">Categorias</p><p id="c-categorias" style="font-size:1.6rem;font-weight:700;">—</p></div>
+    <div class="card card-body"><p class="text-muted" style="font-size:0.75rem;text-transform:uppercase;">Unidades</p><p id="c-unidades" style="font-size:1.6rem;font-weight:700;">—</p></div>
     <div class="card card-body"><p class="text-muted" style="font-size:0.75rem;text-transform:uppercase;">Usuários</p><p id="c-usuarios" style="font-size:1.6rem;font-weight:700;">—</p></div>
   </div>
 
@@ -39,6 +40,7 @@
   <div style="display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:20px;">
     <button class="btn btn-ghost" id="tab-users" onclick="showTab('users')" style="border-radius:6px 6px 0 0;border-bottom:2px solid var(--accent);">Usuários</button>
     <button class="btn btn-ghost" id="tab-cats" onclick="showTab('cats')" style="border-radius:6px 6px 0 0;">Categorias</button>
+    <button class="btn btn-ghost" id="tab-unids" onclick="showTab('unids')" style="border-radius:6px 6px 0 0;">Unidades</button>
     <button class="btn btn-ghost" id="tab-import" onclick="showTab('import')" style="border-radius:6px 6px 0 0;">Importar via IA</button>
   </div>
 
@@ -63,6 +65,18 @@
     <div class="card"><div class="table-wrap"><table>
       <thead><tr><th>Nome</th><th>Cores</th><th></th></tr></thead>
       <tbody id="catsTbody"></tbody>
+    </table></div></div>
+  </div>
+
+  <!-- UNITS section -->
+  <div id="sec-unids" style="display:none;">
+    <div class="page-header" style="margin-bottom:12px;">
+      <h2 style="font-size:1rem;font-weight:600;">Unidades</h2>
+      <button class="btn btn-primary btn-sm" onclick="openUnidForm()">+ Nova unidade</button>
+    </div>
+    <div class="card"><div class="table-wrap"><table>
+      <thead><tr><th>Nome</th><th></th></tr></thead>
+      <tbody id="unidsTbody"></tbody>
     </table></div></div>
   </div>
 
@@ -130,6 +144,19 @@
   </div>
 </div>
 
+<!-- Unit form modal -->
+<div id="unidModal" class="modal-backdrop">
+  <div class="modal">
+    <div class="modal-header"><h3 id="unidModalTitle">Nova Unidade</h3><button class="btn btn-ghost" onclick="closeUnidForm()">✕</button></div>
+    <input type="hidden" id="un-id">
+    <div class="form-group"><label class="form-label">Nome</label><input id="un-nome" class="form-control" placeholder="Ex.: Caixa"></div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-primary" id="btn-saveunid" onclick="saveUnid()">Salvar</button>
+      <button class="btn btn-secondary" onclick="closeUnidForm()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 <script src="assets/app.js"></script>
 <script>
@@ -143,6 +170,7 @@ async function loadDashboard() {
   document.getElementById('c-planilhas').textContent  = d.total_planilhas;
   document.getElementById('c-itens').textContent      = d.total_itens;
   document.getElementById('c-categorias').textContent = d.total_categorias;
+  document.getElementById('c-unidades').textContent   = d.total_unidades;
   document.getElementById('c-usuarios').textContent   = d.total_usuarios;
 }
 
@@ -185,14 +213,35 @@ async function loadCats() {
   });
 }
 
+async function loadUnids() {
+  const tbSkel = document.getElementById('unidsTbody');
+  tbSkel.innerHTML = `<tr class="skeleton-row"><td>x</td><td>x</td></tr>`.repeat(3);
+  const res = await apiFetch('/api/unidades');
+  const { unidades } = await res.json();
+  const tb = document.getElementById('unidsTbody');
+  tb.innerHTML = '';
+  unidades.forEach(u => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td style="font-weight:500">${u.nome}</td>
+      <td style="text-align:right;display:flex;gap:6px;justify-content:flex-end;">
+        <button class="btn btn-secondary btn-sm" onclick='editUnid(${JSON.stringify(u)})'>Editar</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteUnid(${u.id},'${u.nome}')">Excluir</button>
+      </td>`;
+    tb.appendChild(tr);
+  });
+}
+
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 function showTab(tab) {
   document.getElementById('sec-users').style.display  = tab === 'users'  ? '' : 'none';
   document.getElementById('sec-cats').style.display   = tab === 'cats'   ? '' : 'none';
+  document.getElementById('sec-unids').style.display  = tab === 'unids'  ? '' : 'none';
   document.getElementById('sec-import').style.display = tab === 'import' ? '' : 'none';
   document.getElementById('tab-users').style.borderBottom  = tab === 'users'  ? '2px solid var(--accent)' : 'none';
   document.getElementById('tab-cats').style.borderBottom   = tab === 'cats'   ? '2px solid var(--accent)' : 'none';
+  document.getElementById('tab-unids').style.borderBottom  = tab === 'unids'  ? '2px solid var(--accent)' : 'none';
   document.getElementById('tab-import').style.borderBottom = tab === 'import' ? '2px solid var(--accent)' : 'none';
+  if (tab === 'unids') loadUnids();
 }
 
 // ── User form ─────────────────────────────────────────────────────────────────
@@ -324,6 +373,45 @@ async function deleteCat(id, name) {
   else toast(d.error ?? 'Erro', 'err');
 }
 
+// ── Unit form ─────────────────────────────────────────────────────────────────
+function openUnidForm() {
+  document.getElementById('unidModalTitle').textContent = 'Nova Unidade';
+  document.getElementById('un-id').value   = '';
+  document.getElementById('un-nome').value = '';
+  document.getElementById('unidModal').classList.add('open');
+}
+
+function editUnid(u) {
+  document.getElementById('unidModalTitle').textContent = 'Editar Unidade';
+  document.getElementById('un-id').value   = u.id;
+  document.getElementById('un-nome').value = u.nome;
+  document.getElementById('unidModal').classList.add('open');
+}
+
+function closeUnidForm() { document.getElementById('unidModal').classList.remove('open'); }
+
+async function saveUnid() {
+  await withBusy(document.getElementById('btn-saveunid'), 'Salvando…', async () => {
+    const id = document.getElementById('un-id').value;
+    const nome = document.getElementById('un-nome').value.trim();
+    if (!nome) { toast('Nome obrigatório', 'err'); return; }
+    const res = await apiFetch(id ? `/api/unidades/${id}` : '/api/unidades', {
+      method: id ? 'PATCH' : 'POST', body: JSON.stringify({ nome }),
+    });
+    const d = await res.json();
+    if (res.ok) { closeUnidForm(); loadUnids(); loadDashboard(); toast('Salvo', 'ok'); }
+    else toast(d.error ?? 'Erro', 'err');
+  });
+}
+
+async function deleteUnid(id, name) {
+  if (!confirm(`Excluir "${name}"?`)) return;
+  const res = await apiFetch(`/api/unidades/${id}`, { method: 'DELETE' });
+  const d = await res.json();
+  if (d.ok) { loadUnids(); loadDashboard(); toast('Excluída', 'ok'); }
+  else toast(d.error ?? 'Erro', 'err');
+}
+
 // ── Sincronização manual ─────────────────────────────────────────────────────────
 function atualizarSyncInfo() {
   const n = offlineQueueCount();
@@ -336,7 +424,7 @@ async function sincronizarAgora() {
   await withBusy(document.getElementById('btn-sync'), 'Sincronizando…', async () => {
     const pendentesAntes = offlineQueueCount();
     const { ok, falha, restantes } = await forcarSincronizacao();
-    await Promise.all([loadDashboard(), loadUsers(), loadCats()]);
+    await Promise.all([loadDashboard(), loadUsers(), loadCats(), loadUnids()]);
     atualizarSyncInfo();
 
     if (pendentesAntes === 0) toast('Dados atualizados', 'ok');

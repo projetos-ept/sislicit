@@ -63,8 +63,9 @@ app.get('/:id', async (c) => {
 
   const total = itens.results.reduce((s, i) => s + i.valor_total, 0);
   const cats = await c.env.DB.prepare('SELECT * FROM categorias ORDER BY nome').all();
+  const unidades = await c.env.DB.prepare('SELECT * FROM unidades ORDER BY nome').all();
 
-  return c.json({ planilha, itens: itens.results, total, total_fmt: fmtBRL(total), categorias: cats.results });
+  return c.json({ planilha, itens: itens.results, total, total_fmt: fmtBRL(total), categorias: cats.results, unidades: unidades.results });
 });
 
 app.patch('/:id', async (c) => {

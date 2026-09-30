@@ -140,7 +140,13 @@
     <div class="new-item-grid">
       <div class="form-group" style="margin:0"><label class="form-label">Item *</label><input id="ni-item" class="form-control" placeholder="Nome do item"></div>
       <div class="form-group" style="margin:0"><label class="form-label">Descrição</label><input id="ni-desc" class="form-control" placeholder="Opcional"></div>
-      <div class="form-group" style="margin:0"><label class="form-label">Unid.</label><input id="ni-unid" class="form-control" placeholder="UN"></div>
+      <div class="form-group" style="margin:0">
+        <label class="form-label">Unid.</label>
+        <select id="ni-unid" class="form-control" onchange="onNiUnidChange()">
+          <option value="">— Sem unidade</option>
+          <option value="__nova__">+ Nova unidade…</option>
+        </select>
+      </div>
       <div class="form-group" style="margin:0"><label class="form-label">Qtd.</label><input id="ni-qtd" class="form-control" type="number" min="0" value="1"></div>
       <div class="form-group" style="margin:0"><label class="form-label">Vl. Unit.</label><input id="ni-vu" class="form-control" type="number" min="0" step="0.01" value="0"></div>
       <div class="form-group" style="margin:0"><label class="form-label">Total</label><input id="ni-vt" class="form-control mono" readonly value="R$ 0,00"></div>
@@ -157,6 +163,10 @@
       <div class="form-group" style="margin:0"><label class="form-label">Cor</label><input id="ni-cat-cor" type="color" class="form-control" value="#BFDBFE" style="padding:2px;height:38px;"></div>
       <div id="ni-cat-palette" class="palette-swatches" style="margin-top:0;"></div>
       <button class="btn btn-secondary btn-sm" onclick="criarCategoriaInline()">Criar</button>
+    </div>
+    <div id="ni-novaUnid" style="display:none;gap:8px;align-items:end;flex-wrap:wrap;margin-top:8px;">
+      <div class="form-group" style="margin:0"><label class="form-label">Nome da unidade</label><input id="ni-unid-nome" class="form-control" placeholder="Ex.: Caixa"></div>
+      <button class="btn btn-secondary btn-sm" onclick="criarUnidadeInline()">Criar</button>
     </div>
     <div style="display:flex;gap:8px;margin-top:12px;">
       <button class="btn btn-primary btn-sm" id="btn-additem" onclick="addItem()">Adicionar</button>
@@ -191,6 +201,7 @@ if (!PID) location.href = 'planilhas.html';
 document.getElementById('btnImprimir').href = `imprimir.html?id=${PID}`;
 
 let CATS = [];
+let UNIDADES = [];
 let _sortState = { col: null, dir: null };
 let selectedCat = null;
 const pendingChanges = new Map(); // itemId -> { campo: valor }
@@ -209,6 +220,8 @@ async function load() {
   const d = await res.json();
   CATS = d.categorias ?? [];
   populateNiCat();
+  UNIDADES = d.unidades ?? [];
+  populateNiUnid();
 
   document.title = `SisLicit — ${d.planilha.titulo}`;
   document.getElementById('titulo').textContent = d.planilha.titulo;
@@ -352,23 +365,34 @@ let _activeCellItemId = null;
 let _activeCellCampo = null;
 
 function activateCell(span, itemId) {
-  if (span.querySelector('input')) return;
+  if (span.querySelector('input, select')) return;
   closeActiveCell();
 
   const campo = span.dataset.campo;
   const isNum = span.classList.contains('num');
+  const isUnidade = campo === 'unidade';
   const current = pendingChanges.get(itemId)?.[campo] ?? span.textContent.trim();
 
-  const input = document.createElement('input');
-  input.type = isNum ? 'number' : 'text';
-  input.className = 'cell-input' + (isNum ? ' num' : '');
-  input.value = current;
+  let input;
+  if (isUnidade) {
+    input = document.createElement('select');
+    input.className = 'cell-input';
+    const opcoes = UNIDADES.map(u => u.nome);
+    if (current && !opcoes.includes(current)) opcoes.unshift(current);
+    input.innerHTML = '<option value="">—</option>' + opcoes.map(o => `<option value="${o}">${o}</option>`).join('');
+    input.value = current;
+  } else {
+    input = document.createElement('input');
+    input.type = isNum ? 'number' : 'text';
+    input.className = 'cell-input' + (isNum ? ' num' : '');
+    input.value = current;
+  }
   input.style.width = Math.max(span.offsetWidth, 60) + 'px';
 
   span.innerHTML = '';
   span.appendChild(input);
   input.focus();
-  input.select();
+  if (!isUnidade) input.select();
 
   input.addEventListener('input', () => {
     if (!pendingChanges.has(itemId)) pendingChanges.set(itemId, {});
@@ -376,6 +400,7 @@ function activateCell(span, itemId) {
     // Live total preview
     if (campo === 'quantidade' || campo === 'valor_unitario') updateLiveTotal(input.closest('tr'), itemId);
   });
+  if (isUnidade) input.addEventListener('change', () => closeActiveCell());
 
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); closeActiveCell(); }
@@ -400,7 +425,7 @@ function closeActiveCell() {
   const span = _activeCellSpan, itemId = _activeCellItemId, campo = _activeCellCampo;
   _activeCellSpan = null; _activeCellItemId = null; _activeCellCampo = null;
 
-  const input = span.querySelector('input');
+  const input = span.querySelector('input, select');
   if (!input) return;
   const changes = pendingChanges.get(itemId);
   if (changes && campo in changes) {
@@ -606,6 +631,41 @@ async function criarCategoriaInline() {
   } else toast(d.error ?? 'Erro', 'err');
 }
 
+function populateNiUnid() {
+  const sel = document.getElementById('ni-unid');
+  const atual = sel.value;
+  sel.innerHTML = '<option value="">— Sem unidade</option>' +
+    UNIDADES.map(u => `<option value="${u.nome}">${u.nome}</option>`).join('') +
+    '<option value="__nova__">+ Nova unidade…</option>';
+  if (UNIDADES.some(u => u.nome === atual)) sel.value = atual;
+}
+
+function onNiUnidChange() {
+  const sel = document.getElementById('ni-unid');
+  const painel = document.getElementById('ni-novaUnid');
+  if (sel.value === '__nova__') {
+    painel.style.display = 'flex';
+    document.getElementById('ni-unid-nome').focus();
+  } else {
+    painel.style.display = 'none';
+  }
+}
+
+async function criarUnidadeInline() {
+  const nome = document.getElementById('ni-unid-nome').value.trim();
+  if (!nome) { toast('Nome da unidade obrigatório', 'err'); return; }
+  const res = await apiFetch('/api/unidades', { method: 'POST', body: JSON.stringify({ nome }) });
+  const d = await res.json();
+  if (res.ok) {
+    if (!UNIDADES.some(u => u.nome.toLowerCase() === d.unidade.nome.toLowerCase())) UNIDADES.push(d.unidade);
+    populateNiUnid();
+    document.getElementById('ni-unid').value = d.unidade.nome;
+    document.getElementById('ni-novaUnid').style.display = 'none';
+    document.getElementById('ni-unid-nome').value = '';
+    toast('Unidade criada', 'ok');
+  } else toast(d.error ?? 'Erro', 'err');
+}
+
 async function addItem() {
   await withBusy(document.getElementById('btn-additem'), 'Adicionando…', async () => {
     const item = document.getElementById('ni-item').value.trim();
@@ -615,7 +675,7 @@ async function addItem() {
       body: JSON.stringify({
         item,
         descricao:      document.getElementById('ni-desc').value.trim() || null,
-        unidade:        document.getElementById('ni-unid').value.trim() || null,
+        unidade:        document.getElementById('ni-unid').value || null,
         quantidade:     parseFloat(document.getElementById('ni-qtd').value) || 0,
         valor_unitario: parseFloat(document.getElementById('ni-vu').value)  || 0,
         categoria_id:   document.getElementById('ni-cat').value ? Number(document.getElementById('ni-cat').value) : null,

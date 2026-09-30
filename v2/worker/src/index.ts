@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 import authRoutes      from './routes/auth';
 import planilhasRoutes from './routes/planilhas';
 import categoriasRoutes from './routes/categorias';
+import unidadesRoutes  from './routes/unidades';
 import adminRoutes     from './routes/admin';
 import { authMiddleware } from './auth';
 
@@ -36,10 +37,12 @@ app.route('/api/auth', authRoutes);
 // ── PROTECTED ─────────────────────────────────────────────────────────────────
 app.use('/api/planilhas/*', authMiddleware);
 app.use('/api/categorias/*', authMiddleware);
+app.use('/api/unidades/*', authMiddleware);
 app.use('/api/admin/*', authMiddleware);
 
 app.route('/api/planilhas',  planilhasRoutes);
 app.route('/api/categorias', categoriasRoutes);
+app.route('/api/unidades',   unidadesRoutes);
 app.route('/api/admin',      adminRoutes);
 
 // ── HEALTH ────────────────────────────────────────────────────────────────────
