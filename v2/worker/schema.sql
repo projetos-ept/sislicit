@@ -30,6 +30,14 @@ CREATE TABLE IF NOT EXISTS planilhas (
   atualizado_em TEXT  NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS unidades (
+  id   INTEGER PRIMARY KEY AUTOINCREMENT,
+  nome TEXT    NOT NULL UNIQUE
+);
+
+INSERT OR IGNORE INTO unidades (nome) VALUES
+  ('Unidade'), ('Caixa'), ('Pacote'), ('Kit'), ('Frasco'), ('Galão'), ('Bandeja');
+
 CREATE TABLE IF NOT EXISTS itens (
   id             INTEGER PRIMARY KEY AUTOINCREMENT,
   planilha_id    INTEGER NOT NULL REFERENCES planilhas(id) ON DELETE CASCADE,
