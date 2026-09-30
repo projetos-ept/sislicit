@@ -24,13 +24,19 @@ Regras:
 - Categorias e unidades com o mesmo nome (sem diferenciar maiúsculas/minúsculas) são agrupadas automaticamente — use o mesmo nome, exatamente igual, em todos os itens do mesmo grupo.
 - Um item por linha/produto do pedido; não agrupe itens diferentes.
 
+Orientações gerais de redação da "descricao" (padrão de processos de licitação):
+- NÃO cite marcas, fabricantes ou modelos comerciais específicos — descreva por características técnicas genéricas, de forma que qualquer fornecedor equivalente possa atender (evita direcionamento de licitação). Se o pedido original citar uma marca, converta pra especificação técnica equivalente (ex.: "cadeira tipo Presidente da marca X" → "cadeira giratória com apoio lombar e braços reguláveis").
+- Quando o item tiver várias características técnicas (dimensões, material, voltagem, capacidade, certificações, etc.), separe cada uma com ponto e vírgula ( ; ) em vez de vírgula ou quebra de linha, formando uma lista corrida dentro do próprio texto da descrição.
+- Para produtos com prazo de validade (reagentes, medicamentos, insumos perecíveis, materiais com validade de fabricação, etc.), SEMPRE inclua ao final da descrição, como a última informação, separada por ponto e vírgula: "a validade do produto apresentado deve ser de no mínimo 75% do prazo total de validade".
+- Mantenha a descrição objetiva e técnica, sem termos publicitários ("o melhor", "de alta qualidade" sem especificação concreta, etc.).
+
 Exemplo de saída válida:
 [
-  { "item": "Cadeira de escritório giratória", "descricao": "Com apoio de braço, cor preta", "unidade": "Unidade", "quantidade": 10, "valor_unitario": 350.00, "categoria": "Mobiliário" },
+  { "item": "Cadeira de escritório giratória", "descricao": "Giratória; com apoio de braço regulável; encosto e assento estofados; base em aço cromado com rodízios; cor preta", "unidade": "Unidade", "quantidade": 10, "valor_unitario": 350.00, "categoria": "Mobiliário" },
   { "item": "Mesa de reunião 6 lugares", "unidade": "Unidade", "quantidade": 2, "valor_unitario": 1200.00, "categoria": "Mobiliário" },
   { "item": "Resma de papel A4", "unidade": "Pacote", "quantidade": 5, "valor_unitario": 22.90, "categoria": "Material de escritório" },
-  { "item": "Luva de procedimento não estéril", "unidade": "Caixa", "quantidade": 20, "valor_unitario": 35.00, "categoria": "EPI e Biossegurança" },
-  { "item": "Reagente para glicemia", "unidade": "Frasco", "quantidade": 6, "valor_unitario": 89.90, "categoria": "Bioquímica" }
+  { "item": "Luva de procedimento não estéril", "descricao": "Látex ou nitrílica; ambidestra; sem pó; tamanho M; caixa com 100 unidades", "unidade": "Caixa", "quantidade": 20, "valor_unitario": 35.00, "categoria": "EPI e Biossegurança" },
+  { "item": "Reagente para glicemia", "descricao": "Compatível com sistema automatizado de bioquímica; embalagem original do fabricante; a validade do produto apresentado deve ser de no mínimo 75% do prazo total de validade", "unidade": "Frasco", "quantidade": 6, "valor_unitario": 89.90, "categoria": "Bioquímica" }
 ]
 
 Pedido a transformar (cole abaixo, entre as aspas triplas):
