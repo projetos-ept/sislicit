@@ -273,6 +273,39 @@ app.post('/:id/bulk/excluir', async (c) => {
   return c.json({ ok: true });
 });
 
+app.post('/:id/bulk/copiar', async (c) => {
+  const user = c.get('user') as JWTPayload;
+  const origem = await getPlanilha(c.env.DB, Number(c.req.param('id')));
+  if (!origem) return c.json({ error: 'Não encontrado' }, 404);
+  if (!canAccess(user, origem)) return c.json({ error: 'Sem acesso' }, 403);
+
+  const { ids, destino_id } = await c.req.json<{ ids: number[]; destino_id: number }>();
+  if (!ids?.length) return c.json({ error: 'Nenhum item selecionado' }, 400);
+  if (!destino_id) return c.json({ error: 'Planilha de destino obrigatória' }, 400);
+  if (destino_id === origem.id) return c.json({ error: 'Escolha uma planilha de destino diferente da atual' }, 400);
+
+  const destino = await getPlanilha(c.env.DB, destino_id);
+  if (!destino) return c.json({ error: 'Planilha de destino não encontrada' }, 404);
+  if (!canAccess(user, destino)) return c.json({ error: 'Sem acesso à planilha de destino' }, 403);
+
+  const placeholders = ids.map(() => '?').join(',');
+  const itens = await c.env.DB.prepare(
+    `SELECT * FROM itens WHERE planilha_id = ? AND id IN (${placeholders}) ORDER BY ordem ASC`
+  ).bind(origem.id, ...ids).all<ItemRow>();
+  if (!itens.results.length) return c.json({ error: 'Nenhum item encontrado' }, 404);
+
+  const maxOrd = (await c.env.DB.prepare('SELECT COALESCE(MAX(ordem),0) AS m FROM itens WHERE planilha_id = ?')
+    .bind(destino.id).first<{ m: number }>())?.m ?? 0;
+
+  const stmts = itens.results.map((i, idx) => c.env.DB.prepare(
+    'INSERT INTO itens (planilha_id, categoria_id, n, ordem, item, descricao, unidade, quantidade, valor_unitario, valor_total) VALUES (?,?,?,?,?,?,?,?,?,?)'
+  ).bind(destino.id, i.categoria_id, maxOrd + idx + 1, maxOrd + idx + 1, i.item, i.descricao, i.unidade, i.quantidade, i.valor_unitario, i.valor_total));
+  await c.env.DB.batch(stmts);
+  await touchPlanilha(c.env.DB, destino.id);
+
+  return c.json({ ok: true, copiados: itens.results.length });
+});
+
 // ── EXPORT JSON ───────────────────────────────────────────────────────────────
 
 app.get('/:id/export/json', async (c) => {
