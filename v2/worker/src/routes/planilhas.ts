@@ -423,7 +423,7 @@ app.post('/:id/import/json', async (c) => {
   const list: ItemInput[] = Array.isArray(body) ? body : (body.itens ?? []);
 
   if (!list.length) return c.json({ error: 'Nenhum item no JSON' }, 400);
-  const limited = list.slice(0, 40);
+  const limited = list.slice(0, 200);
 
   // Resolve nomes de categoria pra ids, criando as que ainda não existem
   // (mesma paleta de cores usada na criação manual, em rotação).

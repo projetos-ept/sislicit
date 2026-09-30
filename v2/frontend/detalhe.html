@@ -31,11 +31,15 @@
       <p id="subtitulo" class="text-muted" style="font-size:0.82rem;margin-top:2px;"></p>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn btn-primary btn-sm" onclick="toggleNewPanel()">+ Novo item</button>
+      <button class="btn btn-secondary btn-sm" onclick="openJsonModal()">+ Novo item (.json)</button>
       <button class="btn btn-secondary btn-sm" onclick="copiarPromptImportarIA()" title="Copia um prompt pronto pra gerar o JSON de importação numa IA">📋 Prompt IA</button>
       <button class="btn btn-secondary btn-sm" onclick="agrupar()">⊞ Agrupar cat.</button>
       <a id="btnImprimir" href="#" class="btn btn-secondary btn-sm" target="_blank" rel="noopener">🖨 Imprimir</a>
-      <a id="btnExcelFull" href="#" class="btn btn-secondary btn-sm" onclick="exportExcel(event)">⬇ Excel</a>
-      <a id="btnJsonFull"  href="#" class="btn btn-secondary btn-sm" onclick="exportJson(event)">⬇ JSON</a>
+      <a id="btnExcelFull" href="#" class="btn btn-secondary btn-sm" onclick="exportExcel(event)">⬆ Excel</a>
+      <a id="btnJsonFull"  href="#" class="btn btn-secondary btn-sm" onclick="exportJson(event)">⬆ JSON</a>
+      <button class="btn btn-secondary btn-sm" onclick="document.getElementById('jsonFileInput').click()" title="Importar itens de um arquivo .json (até 200 itens)">⬇ Importar arquivo</button>
+      <input type="file" id="jsonFileInput" accept="application/json,.json" style="display:none" onchange="importJsonArquivo(event)">
     </div>
   </div>
 
@@ -168,7 +172,7 @@
       <h3>Importar JSON</h3>
       <button class="btn btn-ghost" onclick="closeJsonModal()">✕</button>
     </div>
-    <p class="text-muted" style="font-size:0.82rem;margin-bottom:12px;">Cole uma lista <code>[{...}]</code> ou <code>{"itens":[...]}</code>. Máximo 40 itens. O campo <code>categoria</code> é opcional — se informado, a categoria é criada automaticamente (ou reaproveitada, se já existir com o mesmo nome).</p>
+    <p class="text-muted" style="font-size:0.82rem;margin-bottom:12px;">Cole uma lista <code>[{...}]</code> ou <code>{"itens":[...]}</code>. Máximo 200 itens. O campo <code>categoria</code> é opcional — se informado, a categoria é criada automaticamente (ou reaproveitada, se já existir com o mesmo nome).</p>
     <textarea id="jsonText" class="form-control" rows="10" placeholder='[{"item":"Nome","unidade":"UN","quantidade":1,"valor_unitario":10,"categoria":"Mobiliário"}]'></textarea>
     <div style="display:flex;gap:8px;margin-top:12px;">
       <button class="btn btn-primary" onclick="importJson()">Importar</button>
@@ -652,6 +656,23 @@ async function importJson() {
   });
   const d = await res.json();
   if (d.ok) { closeJsonModal(); load(); toast(`${d.importados} item(s) importado(s)`, 'ok'); }
+  else toast(d.error ?? 'Erro', 'err');
+}
+
+async function importJsonArquivo(e) {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+
+  let body;
+  try { body = JSON.parse(await file.text()); }
+  catch { toast('Arquivo não é um JSON válido', 'err'); return; }
+
+  const res = await apiFetch(`/api/planilhas/${PID}/import/json`, {
+    method: 'POST', body: JSON.stringify(body),
+  });
+  const d = await res.json();
+  if (d.ok) { load(); toast(`${d.importados} item(s) importado(s) do arquivo`, 'ok'); }
   else toast(d.error ?? 'Erro', 'err');
 }
 
