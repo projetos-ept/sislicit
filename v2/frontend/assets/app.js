@@ -13,18 +13,19 @@ Regras:
 - Responda APENAS com o JSON puro, sem texto antes ou depois, sem markdown (sem \`\`\`).
 - O formato de saída é um array de itens, seguindo exatamente este schema:
   [
-    { "item": "string (obrigatório)", "descricao": "string (opcional)", "unidade": "string (opcional, ex: UN, CX, KG)", "quantidade": number, "valor_unitario": number }
+    { "item": "string (obrigatório)", "descricao": "string (opcional)", "unidade": "string (opcional, ex: UN, CX, KG)", "quantidade": number, "valor_unitario": number, "categoria": "string (opcional)" }
   ]
 - Não inclua "valor_total" — ele é calculado automaticamente (quantidade × valor_unitario).
 - Extraia quantidade e unidade do texto sempre que possível (ex.: "10 cadeiras" → quantidade: 10, unidade: "UN").
 - Se o valor unitário não for informado no pedido, use 0.
+- "categoria" é o nome de um grupo/categoria pro item (ex.: "Mobiliário", "Informática", "EPI"). Se o pedido não indicar categorias, pode omitir o campo. Categorias com o mesmo nome (sem diferenciar maiúsculas/minúsculas) são agrupadas automaticamente na importação; se ainda não existirem no sistema, são criadas.
 - Um item por linha/produto do pedido; não agrupe itens diferentes.
 
 Exemplo de saída válida:
 [
-  { "item": "Cadeira de escritório giratória", "descricao": "Com apoio de braço, cor preta", "unidade": "UN", "quantidade": 10, "valor_unitario": 350.00 },
-  { "item": "Mesa de reunião 6 lugares", "unidade": "UN", "quantidade": 2, "valor_unitario": 1200.00 },
-  { "item": "Resma de papel A4", "unidade": "CX", "quantidade": 5, "valor_unitario": 22.90 }
+  { "item": "Cadeira de escritório giratória", "descricao": "Com apoio de braço, cor preta", "unidade": "UN", "quantidade": 10, "valor_unitario": 350.00, "categoria": "Mobiliário" },
+  { "item": "Mesa de reunião 6 lugares", "unidade": "UN", "quantidade": 2, "valor_unitario": 1200.00, "categoria": "Mobiliário" },
+  { "item": "Resma de papel A4", "unidade": "CX", "quantidade": 5, "valor_unitario": 22.90, "categoria": "Material de escritório" }
 ]
 
 Pedido a transformar (cole abaixo, entre as aspas triplas):

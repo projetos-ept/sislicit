@@ -41,6 +41,18 @@ export function calcularVariantes(corHex: string): { cor_borda_hex: string; cor_
   return { cor_borda_hex, cor_texto_hex };
 }
 
+// ── Paleta padrão de cores para categorias (espelha CATEGORIA_PALETTE do app.js) ─
+// Usada para atribuir cor automaticamente a categorias criadas via importação.
+
+const CATEGORIA_PALETTE_HEX = [
+  '#BFDBFE', '#FEF08A', '#FED7AA', '#E5E7EB',
+  '#BBF7D0', '#FECACA', '#DDD6FE', '#A5F3FC',
+];
+
+export function proximaCorPalette(totalCategoriasExistentes: number): string {
+  return CATEGORIA_PALETTE_HEX[totalCategoriasExistentes % CATEGORIA_PALETTE_HEX.length];
+}
+
 // ── Renumber items after insert/delete ───────────────────────────────────────
 
 export async function renumerar(db: D1Database, planilhaId: number) {

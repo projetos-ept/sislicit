@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Env } from '../index';
 import type { JWTPayload } from '../auth';
-import { fmtBRL, renumerar, touchPlanilha } from '../utils';
+import { calcularVariantes, fmtBRL, proximaCorPalette, renumerar, touchPlanilha } from '../utils';
 import { gerarXlsxPlanilha } from '../xlsx-writer';
 
 type PlanilhaRow = { id: number; titulo: string; descricao: string | null; numero_proc: string | null; criado_por: number; criado_em: string; atualizado_em: string };
@@ -418,12 +418,37 @@ app.post('/:id/import/json', async (c) => {
   if (!planilha) return c.json({ error: 'Não encontrado' }, 404);
   if (!canAccess(user, planilha)) return c.json({ error: 'Sem acesso' }, 403);
 
-  type ItemInput = { item: string; descricao?: string; unidade?: string; quantidade?: number; valor_unitario?: number };
+  type ItemInput = { item: string; descricao?: string; unidade?: string; quantidade?: number; valor_unitario?: number; categoria?: string };
   const body = await c.req.json<{ itens?: ItemInput[] } | ItemInput[]>();
   const list: ItemInput[] = Array.isArray(body) ? body : (body.itens ?? []);
 
   if (!list.length) return c.json({ error: 'Nenhum item no JSON' }, 400);
   const limited = list.slice(0, 40);
+
+  // Resolve nomes de categoria pra ids, criando as que ainda não existem
+  // (mesma paleta de cores usada na criação manual, em rotação).
+  const nomesUnicos = [...new Set(
+    limited.map(it => it.categoria?.trim()).filter((n): n is string => !!n)
+  )];
+
+  const catIdPorNome = new Map<string, number>();
+  if (nomesUnicos.length) {
+    const existentes = await c.env.DB.prepare('SELECT id, nome FROM categorias').all<{ id: number; nome: string }>();
+    for (const cat of existentes.results) catIdPorNome.set(cat.nome.trim().toLowerCase(), cat.id);
+
+    let totalCategorias = existentes.results.length;
+    for (const nome of nomesUnicos) {
+      const chave = nome.toLowerCase();
+      if (catIdPorNome.has(chave)) continue;
+      const corHex = proximaCorPalette(totalCategorias);
+      const { cor_borda_hex, cor_texto_hex } = calcularVariantes(corHex);
+      const r = await c.env.DB.prepare(
+        'INSERT INTO categorias (nome, cor_hex, cor_borda_hex, cor_texto_hex, rotulo_oculto) VALUES (?,?,?,?,?) RETURNING id'
+      ).bind(nome, corHex, cor_borda_hex, cor_texto_hex, chave).first<{ id: number }>();
+      if (r) catIdPorNome.set(chave, r.id);
+      totalCategorias++;
+    }
+  }
 
   const maxOrd = (await c.env.DB.prepare('SELECT COALESCE(MAX(ordem),0) AS m FROM itens WHERE planilha_id = ?')
     .bind(planilha.id).first<{ m: number }>())?.m ?? 0;
@@ -431,9 +456,10 @@ app.post('/:id/import/json', async (c) => {
   const stmts = limited.map((it, i) => {
     const qtd = Number(it.quantidade ?? 0);
     const vu  = Number(it.valor_unitario ?? 0);
+    const catId = it.categoria?.trim() ? catIdPorNome.get(it.categoria.trim().toLowerCase()) ?? null : null;
     return c.env.DB.prepare(
-      'INSERT INTO itens (planilha_id, n, ordem, item, descricao, unidade, quantidade, valor_unitario, valor_total) VALUES (?,?,?,?,?,?,?,?,?)'
-    ).bind(planilha.id, maxOrd + i + 1, maxOrd + i + 1, it.item, it.descricao ?? null, it.unidade ?? null, qtd, vu, qtd * vu);
+      'INSERT INTO itens (planilha_id, categoria_id, n, ordem, item, descricao, unidade, quantidade, valor_unitario, valor_total) VALUES (?,?,?,?,?,?,?,?,?,?)'
+    ).bind(planilha.id, catId, maxOrd + i + 1, maxOrd + i + 1, it.item, it.descricao ?? null, it.unidade ?? null, qtd, vu, qtd * vu);
   });
 
   await c.env.DB.batch(stmts);

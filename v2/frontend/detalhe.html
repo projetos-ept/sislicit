@@ -168,8 +168,8 @@
       <h3>Importar JSON</h3>
       <button class="btn btn-ghost" onclick="closeJsonModal()">✕</button>
     </div>
-    <p class="text-muted" style="font-size:0.82rem;margin-bottom:12px;">Cole uma lista <code>[{...}]</code> ou <code>{"itens":[...]}</code>. Máximo 40 itens.</p>
-    <textarea id="jsonText" class="form-control" rows="10" placeholder='[{"item":"Nome","unidade":"UN","quantidade":1,"valor_unitario":10}]'></textarea>
+    <p class="text-muted" style="font-size:0.82rem;margin-bottom:12px;">Cole uma lista <code>[{...}]</code> ou <code>{"itens":[...]}</code>. Máximo 40 itens. O campo <code>categoria</code> é opcional — se informado, a categoria é criada automaticamente (ou reaproveitada, se já existir com o mesmo nome).</p>
+    <textarea id="jsonText" class="form-control" rows="10" placeholder='[{"item":"Nome","unidade":"UN","quantidade":1,"valor_unitario":10,"categoria":"Mobiliário"}]'></textarea>
     <div style="display:flex;gap:8px;margin-top:12px;">
       <button class="btn btn-primary" onclick="importJson()">Importar</button>
       <button class="btn btn-secondary" onclick="closeJsonModal()">Cancelar</button>
