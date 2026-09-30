@@ -22,7 +22,10 @@
 
 <div class="container">
   <div class="page-header">
-    <h1>Planilhas</h1>
+    <div>
+      <h1>Planilhas</h1>
+      <p id="listaResumo" class="text-muted" style="font-size:0.82rem;margin-top:2px;"></p>
+    </div>
     <button class="btn btn-primary" onclick="openNova()">+ Nova planilha</button>
   </div>
 
@@ -62,6 +65,8 @@
           <tr>
             <th>Título</th>
             <th>Nº processo</th>
+            <th>Itens</th>
+            <th>Total</th>
             <th>Criado em</th>
             <th>Atualizado</th>
             <th style="text-align:right;">Ações</th>
@@ -103,7 +108,7 @@ let PLANILHAS = [];
 function renderSkeleton(rows = 4) {
   const tbody = document.getElementById('tbody');
   tbody.innerHTML = Array.from({ length: rows }).map(() =>
-    `<tr class="skeleton-row"><td>x</td><td>x</td><td>x</td><td>x</td><td>x</td></tr>`
+    `<tr class="skeleton-row"><td>x</td><td>x</td><td>x</td><td>x</td><td>x</td><td>x</td><td>x</td></tr>`
   ).join('');
 }
 
@@ -114,9 +119,35 @@ async function load() {
   const res = await apiFetch('/api/planilhas');
   if (!res.ok) { document.getElementById('tbody').innerHTML = ''; return; }
   const { planilhas } = await res.json();
-  PLANILHAS = planilhas ?? [];
-  if (!planilhas.length) { document.getElementById('tbody').innerHTML = ''; document.getElementById('empty').classList.remove('hidden'); return; }
+  if (!planilhas.length) {
+    PLANILHAS = [];
+    document.getElementById('tbody').innerHTML = '';
+    document.getElementById('empty').classList.remove('hidden');
+    document.getElementById('listaResumo').textContent = '';
+    return;
+  }
+
+  // Resumo (itens/total) não vem na listagem — busca o detalhe de cada
+  // planilha em paralelo pra completar sem precisar mudar o backend.
+  PLANILHAS = await Promise.all(planilhas.map(async p => {
+    try {
+      const r = await apiFetch(`/api/planilhas/${p.id}`);
+      if (!r.ok) return { ...p, _itens: null, _total: null, _total_fmt: null };
+      const d = await r.json();
+      return { ...p, _itens: d.itens?.length ?? 0, _total: d.total ?? 0, _total_fmt: d.total_fmt };
+    } catch {
+      return { ...p, _itens: null, _total: null, _total_fmt: null };
+    }
+  }));
+  renderResumoGeral(PLANILHAS);
   renderLista(PLANILHAS);
+}
+
+function renderResumoGeral(planilhas) {
+  const totalItens = planilhas.reduce((s, p) => s + (p._itens ?? 0), 0);
+  const totalGeral = planilhas.reduce((s, p) => s + (p._total ?? 0), 0);
+  document.getElementById('listaResumo').textContent =
+    `${planilhas.length} planilha${planilhas.length !== 1 ? 's' : ''} · ${totalItens} ${totalItens !== 1 ? 'itens' : 'item'} · ${fmtBRL(totalGeral)} no total`;
 }
 
 function renderLista(planilhas) {
@@ -130,6 +161,8 @@ function renderLista(planilhas) {
     tr.innerHTML = `
       <td><a href="detalhe.html?id=${p.id}" style="font-weight:500;">${p.titulo}</a></td>
       <td class="text-muted mono">${p.numero_proc ?? '—'}</td>
+      <td class="text-muted">${p._itens ?? '—'}</td>
+      <td class="mono" style="font-weight:500;">${p._total_fmt ?? '—'}</td>
       <td class="text-muted">${fmtDate(p.criado_em)}</td>
       <td class="text-muted">${fmtDate(p.atualizado_em)}</td>
       <td style="text-align:right;white-space:nowrap;">
@@ -144,10 +177,11 @@ function renderLista(planilhas) {
 
 document.getElementById('busca').addEventListener('input', (e) => {
   const q = e.target.value.trim().toLowerCase();
-  if (!q) { renderLista(PLANILHAS); return; }
-  renderLista(PLANILHAS.filter(p =>
-    p.titulo.toLowerCase().includes(q) || (p.numero_proc ?? '').toLowerCase().includes(q)
-  ));
+  const filtradas = q
+    ? PLANILHAS.filter(p => p.titulo.toLowerCase().includes(q) || (p.numero_proc ?? '').toLowerCase().includes(q))
+    : PLANILHAS;
+  renderResumoGeral(filtradas);
+  renderLista(filtradas);
 });
 
 function openRename(id) {
