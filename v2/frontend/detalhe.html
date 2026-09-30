@@ -65,9 +65,32 @@
   <!-- Bulk bar -->
   <div id="bulkBar" class="bulk-bar">
     <span class="bulk-count" id="bulkCount">0 selecionados</span>
+    <button class="btn btn-secondary btn-sm" onclick="abrirMigrarModal()" title="Copiar para outra planilha">➡ Migrar</button>
     <button class="btn btn-secondary btn-sm" onclick="bulkExcel()">⬇ Excel</button>
     <button class="btn btn-secondary btn-sm" onclick="bulkJson()">⬇ JSON</button>
     <button class="btn btn-danger btn-sm" onclick="bulkDelete()">🗑 Excluir</button>
+  </div>
+
+  <!-- Migrar itens modal -->
+  <div id="migrarModal" class="modal-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Migrar itens para outra planilha</h3>
+        <button class="btn btn-ghost" onclick="closeMigrarModal()">✕</button>
+      </div>
+      <p class="text-muted" style="font-size:0.82rem;margin-bottom:12px;">
+        <span id="migrarCount">0</span> item(ns) selecionado(s) será(ão) <strong>copiado(s)</strong> para a planilha
+        escolhida, com todas as informações (categoria inclusive). Os itens continuam aqui nesta planilha.
+      </p>
+      <div class="form-group">
+        <label class="form-label">Planilha de destino</label>
+        <select id="migrarDestino" class="form-control"></select>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-primary" id="btn-migrar" onclick="confirmarMigrar()">Copiar</button>
+        <button class="btn btn-secondary" onclick="closeMigrarModal()">Cancelar</button>
+      </div>
+    </div>
   </div>
 
   <div class="form-group" style="max-width:320px;">
@@ -707,6 +730,43 @@ async function bulkJson() {
   const res = await apiFetch(`/api/planilhas/${PID}/bulk/json`, { method: 'POST', body: JSON.stringify({ ids }) });
   const blob = await res.blob();
   downloadBlob(blob, 'selecao.json');
+}
+
+// ── Migrar (copiar) itens para outra planilha ───────────────────────────────────
+async function abrirMigrarModal() {
+  const ids = getSelectedIds();
+  if (!ids.length) return;
+  document.getElementById('migrarCount').textContent = ids.length;
+
+  const sel = document.getElementById('migrarDestino');
+  sel.innerHTML = '<option value="">Carregando…</option>';
+  document.getElementById('migrarModal').classList.add('open');
+
+  const res = await apiFetch('/api/planilhas');
+  const d = await res.json();
+  const outras = (d.planilhas ?? []).filter(p => String(p.id) !== String(PID));
+  sel.innerHTML = outras.length
+    ? outras.map(p => `<option value="${p.id}">${p.titulo}${p.numero_proc ? ' · ' + p.numero_proc : ''}</option>`).join('')
+    : '<option value="">Nenhuma outra planilha disponível</option>';
+}
+
+function closeMigrarModal() { document.getElementById('migrarModal').classList.remove('open'); }
+
+async function confirmarMigrar() {
+  await withBusy(document.getElementById('btn-migrar'), 'Copiando…', async () => {
+    const ids = getSelectedIds();
+    const destino_id = Number(document.getElementById('migrarDestino').value);
+    if (!destino_id) { toast('Escolha uma planilha de destino', 'err'); return; }
+
+    const res = await apiFetch(`/api/planilhas/${PID}/bulk/copiar`, {
+      method: 'POST', body: JSON.stringify({ ids, destino_id }),
+    });
+    const d = await res.json();
+    if (res.ok) {
+      closeMigrarModal();
+      toast(`${d.copiados} item(ns) copiado(s) para a outra planilha`, 'ok');
+    } else toast(d.error ?? 'Erro', 'err');
+  });
 }
 
 async function exportExcel(e) {
