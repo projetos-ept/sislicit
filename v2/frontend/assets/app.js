@@ -18,6 +18,7 @@ Regras:
 - Não inclua "valor_total" — ele é calculado automaticamente (quantidade × valor_unitario).
 - Extraia quantidade e unidade do texto sempre que possível (ex.: "10 cadeiras" → quantidade: 10, unidade: "UN").
 - Se o valor unitário não for informado no pedido, use 0.
+- "item": sempre em CAIXA ALTA (maiúsculas), independente de como estiver escrito no pedido original.
 - "categoria": classifique CADA item pelo contexto (o que ele é/pra que serve), não apenas pelo nome literal. Use como referência categorias comuns já usadas no sistema, por exemplo: "Acessórios e Equipamentos", "Bioquímica", "Coleta", "EPI e Biossegurança", "Hematologia", "Imunologia", "Livro", "Microbiologia", "Parasitologia", "Urinálise", "Vidrarias" — mas NÃO se limite a essa lista: se o item pedir uma categoria diferente que descreva melhor o grupo dele (ex.: "Mobiliário", "Informática", "Limpeza"), use essa. Se o pedido não permitir inferir nenhuma categoria plausível, pode omitir o campo.
 - "unidade": use como referência as unidades comuns já cadastradas no sistema — "Unidade", "Caixa", "Pacote", "Kit", "Frasco", "Galão", "Bandeja" — e sugira pelo menos mais 2 unidades além dessas quando o contexto pedir (ex.: "Par", "Metro", "Litro", "Rolo", "Ampola", "Frasco-ampola", "Pote", "Tubo", conforme o item), sempre priorizando a que melhor descreve a forma de venda/uso do item.
 - IMPORTANTE: tanto "categoria" quanto "unidade" são apenas nomes (texto livre) — o sistema de importação cria automaticamente qualquer categoria ou unidade que ainda não exista no cadastro, então não hesite em usar o nome mais apropriado mesmo que ele não esteja nas listas de referência acima.
@@ -32,11 +33,11 @@ Orientações gerais de redação da "descricao" (padrão de processos de licita
 
 Exemplo de saída válida:
 [
-  { "item": "Cadeira de escritório giratória", "descricao": "Giratória; com apoio de braço regulável; encosto e assento estofados; base em aço cromado com rodízios; cor preta", "unidade": "Unidade", "quantidade": 10, "valor_unitario": 350.00, "categoria": "Mobiliário" },
-  { "item": "Mesa de reunião 6 lugares", "unidade": "Unidade", "quantidade": 2, "valor_unitario": 1200.00, "categoria": "Mobiliário" },
-  { "item": "Resma de papel A4", "unidade": "Pacote", "quantidade": 5, "valor_unitario": 22.90, "categoria": "Material de escritório" },
-  { "item": "Luva de procedimento não estéril", "descricao": "Látex ou nitrílica; ambidestra; sem pó; tamanho M; caixa com 100 unidades", "unidade": "Caixa", "quantidade": 20, "valor_unitario": 35.00, "categoria": "EPI e Biossegurança" },
-  { "item": "Reagente para glicemia", "descricao": "Compatível com sistema automatizado de bioquímica; embalagem original do fabricante; a validade do produto apresentado deve ser de no mínimo 75% do prazo total de validade", "unidade": "Frasco", "quantidade": 6, "valor_unitario": 89.90, "categoria": "Bioquímica" }
+  { "item": "CADEIRA DE ESCRITÓRIO GIRATÓRIA", "descricao": "Giratória; com apoio de braço regulável; encosto e assento estofados; base em aço cromado com rodízios; cor preta", "unidade": "Unidade", "quantidade": 10, "valor_unitario": 350.00, "categoria": "Mobiliário" },
+  { "item": "MESA DE REUNIÃO 6 LUGARES", "unidade": "Unidade", "quantidade": 2, "valor_unitario": 1200.00, "categoria": "Mobiliário" },
+  { "item": "RESMA DE PAPEL A4", "unidade": "Pacote", "quantidade": 5, "valor_unitario": 22.90, "categoria": "Material de escritório" },
+  { "item": "LUVA DE PROCEDIMENTO NÃO ESTÉRIL", "descricao": "Látex ou nitrílica; ambidestra; sem pó; tamanho M; caixa com 100 unidades", "unidade": "Caixa", "quantidade": 20, "valor_unitario": 35.00, "categoria": "EPI e Biossegurança" },
+  { "item": "REAGENTE PARA GLICEMIA", "descricao": "Compatível com sistema automatizado de bioquímica; embalagem original do fabricante; a validade do produto apresentado deve ser de no mínimo 75% do prazo total de validade", "unidade": "Frasco", "quantidade": 6, "valor_unitario": 89.90, "categoria": "Bioquímica" }
 ]
 
 Pedido a transformar (cole abaixo, entre as aspas triplas):
