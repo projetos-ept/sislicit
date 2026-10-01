@@ -344,7 +344,7 @@ function buildRowHTML(it) {
     <td><span class="cell-display" data-campo="descricao" data-id="${it.id}">${it.descricao ?? ''}</span></td>
     <td><span class="cell-display" data-campo="unidade" data-id="${it.id}">${it.unidade ?? ''}</span></td>
     <td><span class="cell-display num" data-campo="quantidade" data-id="${it.id}">${it.quantidade}</span></td>
-    <td><span class="cell-display num" data-campo="valor_unitario" data-id="${it.id}">${it.valor_unitario}</span></td>
+    <td><span class="cell-display num" data-campo="valor_unitario" data-id="${it.id}" data-raw="${it.valor_unitario}">${fmtBRL(it.valor_unitario)}</span></td>
     <td data-vtotal data-raw="${it.valor_total ?? 0}"><span class="cell-display num">${fmtBRL(it.valor_total)}</span></td>
     <td class="col-actions">
       <button class="btn btn-ghost btn-sm" title="Clonar" onclick="clonarItem(${it.id})">⧉</button>
@@ -372,7 +372,7 @@ function activateCell(span, itemId) {
   const isNum = span.classList.contains('num');
   const isUnidade = campo === 'unidade';
   const isMultiline = campo === 'item' || campo === 'descricao';
-  const current = pendingChanges.get(itemId)?.[campo] ?? span.textContent.trim();
+  const current = pendingChanges.get(itemId)?.[campo] ?? span.dataset.raw ?? span.textContent.trim();
 
   let input;
   if (isUnidade) {
@@ -451,15 +451,19 @@ document.addEventListener('click', (e) => {
 });
 
 function restoreCellDisplay(span, campo, value) {
-  const isNum = ['quantidade','valor_unitario'].includes(campo);
   span.innerHTML = '';
-  span.textContent = value;
+  if (campo === 'valor_unitario') {
+    span.dataset.raw = value;
+    span.textContent = fmtBRL(value);
+  } else {
+    span.textContent = value;
+  }
 }
 
 function updateLiveTotal(tr, itemId) {
   const changes = pendingChanges.get(itemId) ?? {};
   const qtd = changes.quantidade  ?? parseFloat(tr.querySelector('[data-campo="quantidade"]')?.textContent ?? '0');
-  const vu  = changes.valor_unitario ?? parseFloat(tr.querySelector('[data-campo="valor_unitario"]')?.textContent ?? '0');
+  const vu  = changes.valor_unitario ?? parseFloat(tr.querySelector('[data-campo="valor_unitario"]')?.dataset.raw ?? '0');
   const vt  = qtd * vu;
   const vtTd = tr.querySelector('[data-vtotal]');
   if (vtTd) { vtTd.querySelector('.cell-display').textContent = fmtBRL(vt); vtTd.dataset.raw = vt; }
@@ -485,7 +489,13 @@ async function flushRow(itemId) {
     tr.dataset.cat = d.item.categoria_id ?? '';
     tr.querySelectorAll('.cell-display[data-campo]').forEach(span => {
       const c = span.dataset.campo;
-      if (d.item[c] !== undefined) span.textContent = d.item[c] ?? '';
+      if (d.item[c] === undefined) return;
+      if (c === 'valor_unitario') {
+        span.dataset.raw = d.item[c];
+        span.textContent = fmtBRL(d.item[c]);
+      } else {
+        span.textContent = d.item[c] ?? '';
+      }
     });
     const vtTd = tr.querySelector('[data-vtotal]');
     if (vtTd) { vtTd.querySelector('.cell-display').textContent = d.valor_total_fmt; vtTd.dataset.raw = d.valor_total; }
@@ -797,8 +807,8 @@ function sortTable(col, btn, thId) {
       va = parseFloat(a.querySelector('[data-campo="quantidade"]')?.textContent ?? '0');
       vb = parseFloat(b.querySelector('[data-campo="quantidade"]')?.textContent ?? '0');
     } else if (col === 'vunit') {
-      va = parseFloat(a.querySelector('[data-campo="valor_unitario"]')?.textContent ?? '0');
-      vb = parseFloat(b.querySelector('[data-campo="valor_unitario"]')?.textContent ?? '0');
+      va = parseFloat(a.querySelector('[data-campo="valor_unitario"]')?.dataset.raw ?? '0');
+      vb = parseFloat(b.querySelector('[data-campo="valor_unitario"]')?.dataset.raw ?? '0');
     } else {
       va = parseFloat(a.querySelector('[data-vtotal]')?.dataset.raw ?? '0');
       vb = parseFloat(b.querySelector('[data-vtotal]')?.dataset.raw ?? '0');
