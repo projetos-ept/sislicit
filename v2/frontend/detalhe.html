@@ -365,12 +365,13 @@ let _activeCellItemId = null;
 let _activeCellCampo = null;
 
 function activateCell(span, itemId) {
-  if (span.querySelector('input, select')) return;
+  if (span.querySelector('input, select, textarea')) return;
   closeActiveCell();
 
   const campo = span.dataset.campo;
   const isNum = span.classList.contains('num');
   const isUnidade = campo === 'unidade';
+  const isMultiline = campo === 'item' || campo === 'descricao';
   const current = pendingChanges.get(itemId)?.[campo] ?? span.textContent.trim();
 
   let input;
@@ -380,6 +381,11 @@ function activateCell(span, itemId) {
     const opcoes = UNIDADES.map(u => u.nome);
     if (current && !opcoes.includes(current)) opcoes.unshift(current);
     input.innerHTML = '<option value="">—</option>' + opcoes.map(o => `<option value="${o}">${o}</option>`).join('');
+    input.value = current;
+  } else if (isMultiline) {
+    input = document.createElement('textarea');
+    input.className = 'cell-input cell-textarea';
+    input.rows = 4;
     input.value = current;
   } else {
     input = document.createElement('input');
@@ -425,7 +431,7 @@ function closeActiveCell() {
   const span = _activeCellSpan, itemId = _activeCellItemId, campo = _activeCellCampo;
   _activeCellSpan = null; _activeCellItemId = null; _activeCellCampo = null;
 
-  const input = span.querySelector('input, select');
+  const input = span.querySelector('input, select, textarea');
   if (!input) return;
   const changes = pendingChanges.get(itemId);
   if (changes && campo in changes) {

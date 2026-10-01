@@ -232,6 +232,7 @@ td.col-actions { text-align: right; white-space: nowrap; }
 }
 .cell-input:focus { outline: none; }
 .cell-input.num { font-family: var(--mono); text-align: right; }
+.cell-textarea { resize: vertical; min-height: 4.5em; line-height: 1.4; }
 
 /* ── Category badges ─────────────────────────────────────────────────────── */
 .cat-badge {
