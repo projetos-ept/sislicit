@@ -186,6 +186,7 @@
     <textarea id="jsonText" class="form-control" rows="10" placeholder='[{"item":"Nome","unidade":"UN","quantidade":1,"valor_unitario":10,"categoria":"Mobiliário"}]'></textarea>
     <div style="display:flex;gap:8px;margin-top:12px;">
       <button class="btn btn-primary" onclick="importJson()">Importar</button>
+      <button class="btn btn-secondary" onclick="limparJsonText()">Limpar</button>
       <button class="btn btn-secondary" onclick="closeJsonModal()">Cancelar</button>
     </div>
   </div>
@@ -722,6 +723,10 @@ document.getElementById('ni-item').addEventListener('keydown', e => { if (e.key 
 // ── JSON import modal ─────────────────────────────────────────────────────────
 function openJsonModal()  { document.getElementById('jsonModal').classList.add('open'); }
 function closeJsonModal() { document.getElementById('jsonModal').classList.remove('open'); }
+function limparJsonText() {
+  document.getElementById('jsonText').value = '';
+  document.getElementById('jsonText').focus();
+}
 
 async function importJson() {
   let body;
